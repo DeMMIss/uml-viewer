@@ -1,0 +1,90 @@
+(ns uml-viewer.ir
+  (:require [clojure.string :as str]
+            [clojure.edn :as edn]))
+
+(defn- as-id [x]
+  (cond
+    (keyword? x) x
+    (string? x) (keyword (str/replace (str/lower-case x) #"\s+" "-"))
+    (symbol? x) (keyword (name x))
+    :else (throw (ex-info "id must be a keyword or string" {:value x}))))
+
+(defn- as-crap [x]
+  (cond
+    (nil? x) nil
+    (number? x) {:mu (double x) :max (double x) :sigma 0.0}
+    (map? x) {:mu (some-> (:mu x) double)
+              :max (double (or (:max x) (:mu x) 0))
+              :sigma (double (or (:sigma x) (:sd x) 0))}
+    :else (throw (ex-info "crap must be a number or {:mu :max :sigma}" {:value x}))))
+
+(defn- as-member [x]
+  (cond
+    (string? x) {:text x}
+    (map? x) {:text (or (:text x)
+                        (str (:name x)
+                             (when (seq (:args x))
+                               (str "(" (str/join ", " (:args x)) ")"))
+                             (when (:type x) (str " : " (:type x)))
+                             (when (:returns x) (str " : " (:returns x)))))}
+    :else (throw (ex-info "member must be a string or map" {:value x}))))
+
+(defn- as-class [c]
+  (let [name (or (:name c) (some-> (:id c) name))]
+    (when-not name
+      (throw (ex-info "class needs :name or :id" {:class c})))
+    {:id (as-id (or (:id c) name))
+     :name name
+     :stereotype (:stereotype c)
+     :crap (as-crap (:crap c))
+     :fields (mapv as-member (:fields c))
+     :ops (mapv as-member (:ops c))}))
+
+(defn- as-package [p]
+  (let [label (or (:label p) (some-> (:id p) name))]
+    (when-not label
+      (throw (ex-info "package needs :label or :id" {:package p})))
+    {:id (as-id (or (:id p) label))
+     :label label
+     :crap (as-crap (:crap p))
+     :classes (mapv as-class (:classes p))}))
+
+(defn- as-edge [e]
+  (when-not (and (:from e) (:to e))
+    (throw (ex-info "edge needs :from and :to" {:edge e})))
+  {:from (as-id (:from e))
+   :to (as-id (:to e))
+   :kind (keyword (or (:kind e) :association))
+   :label (:label e)})
+
+(defn normalize [raw]
+  (let [diagram {:title (or (:title raw) "UML")
+                 :direction (keyword (or (:direction raw) :tb))
+                 :packages (mapv as-package (:packages raw))
+                 :edges (mapv as-edge (:edges raw))}
+        class-ids (mapcat (fn [p] (map :id (:classes p))) (:packages diagram))
+        dup (ffirst (filter #(> (val %) 1) (frequencies class-ids)))]
+    (when dup
+      (throw (ex-info (str "duplicate class id: " dup) {:id dup})))
+    (let [ids (set class-ids)]
+      (doseq [e (:edges diagram)]
+        (when-not (ids (:from e))
+          (throw (ex-info (str "edge :from unknown class " (:from e)) {:edge e})))
+        (when-not (ids (:to e))
+          (throw (ex-info (str "edge :to unknown class " (:to e)) {:edge e})))))
+    diagram))
+
+(defn read-diagram [s]
+  (normalize (edn/read-string s)))
+
+(defn load-diagram [path]
+  (read-diagram (slurp path)))
+
+(defn class-index [diagram]
+  (into {}
+        (for [p (:packages diagram)
+              c (:classes p)]
+          [(:id c) (assoc c :package (:id p))])))
+
+(defn package-of [diagram class-id]
+  (:package (get (class-index diagram) class-id)))

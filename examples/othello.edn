@@ -1,0 +1,149 @@
+{:title "Othello"
+ :direction :tb
+ :packages
+ [{:id :adapters
+   :label "Adapters"
+   :crap {:mu 3.1 :max 5.8 :sigma 1.7}
+   :classes
+   [{:id :desktop-app
+     :name "DesktopApp"
+     :crap {:mu 2.8 :max 5.2 :sigma 1.5}
+     :ops [{:name "start"}]}
+    {:id :browser-app
+     :name "BrowserApp"
+     :ops [{:name "init"}]}
+    {:id :painter
+     :name "Painter"
+     :crap {:mu 3.3 :max 5.8 :sigma 1.8}
+     :ops [{:name "paint" :args ["viewModel"]}]}
+    {:id :job-port
+     :name "JobPort"
+     :stereotype :interface
+     :ops [{:name "done" :args ["session"] :returns "bool"}
+           {:name "result" :args ["session"] :returns "Square"}
+           {:name "launch" :args ["session"] :returns "Session"}]}
+    {:id :future-job
+     :name "FutureJob"
+     :crap {:mu 2.8 :max 5.2 :sigma 1.5}}
+    {:id :timeout-job
+     :name "TimeoutJob"}]}
+  {:id :ui
+   :label "UI application"
+   :crap {:mu 2.1 :max 9.0 :sigma 1.5}
+   :classes
+   [{:id :host
+     :name "Host"
+     :crap {:mu 1.3 :max 2.0 :sigma 0.5}
+     :ops [{:name "initialState" :args ["player"] :returns "Session"}
+           {:name "onPress" :args ["session" "event"] :returns "Session"}
+           {:name "tick" :args ["session" "jobPort"] :returns "Session"}]}
+    {:id :session
+     :name "Session"
+     :crap {:mu 2.3 :max 7.0 :sigma 1.5}
+     :fields [{:name "phase" :type "Phase"}
+              {:name "game" :type "Game"}
+              {:name "hints" :type "bool"}]
+     :ops [{:name "onClick" :args ["x" "y"]}
+           {:name "onFrame" :args ["jobDone" "jobResult"]}
+           {:name "tick"}
+           {:name "needsAiJob" :returns "bool"}
+           {:name "handleCommand" :args ["id"]}]}
+    {:id :view-model
+     :name "ViewModel"
+     :crap {:mu 2.5 :max 9.0 :sigma 1.8}
+     :ops [{:name "from" :args ["session"] :returns "ViewModel"}]}
+    {:id :layout
+     :name "Layout"
+     :crap {:mu 1.3 :max 3.0 :sigma 0.6}
+     :ops [{:name "squareAt" :args ["x" "y"] :returns "Square"}
+           {:name "buttonAt" :args ["x" "y"] :returns "Button"}
+           {:name "algebraic" :args ["square"] :returns "String"}]}
+    {:id :anim
+     :name "AnimationPolicy"
+     :crap {:mu 1.0 :max 1.0 :sigma 0.0}
+     :ops [{:name "flipsShown" :args ["anim"] :returns "int"}
+           {:name "animationDone" :args ["anim"] :returns "bool"}]}]}
+  {:id :ai
+   :label "AI"
+   :crap {:mu 2.2 :max 4.0 :sigma 1.3}
+   :classes
+   [{:id :player
+     :name "Player"
+     :stereotype :interface
+     :crap {:mu 1.0 :max 1.0 :sigma 0.0}
+     :ops [{:name "move" :args ["board" "side" "opts"] :returns "Square"}]}
+    {:id :search-player
+     :name "SearchPlayer"
+     :crap {:mu 2.5 :max 4.0 :sigma 1.2}
+     :ops [{:name "move" :args ["board" "side" "opts"] :returns "Square"}
+           {:name "negamax" :args ["board" "side" "depth" "a" "b"] :returns "int"}]}
+    {:id :evaluator
+     :name "Evaluator"
+     :crap {:mu 2.0 :max 4.0 :sigma 1.3}
+     :ops [{:name "positional" :args ["board" "side"] :returns "int"}
+           {:name "evaluate" :args ["board" "side"] :returns "int"}]}]}
+  {:id :domain
+   :label "Domain"
+   :crap {:mu 1.7 :max 5.0 :sigma 1.1}
+   :classes
+   [{:id :game
+     :name "Game"
+     :crap {:mu 1.8 :max 4.0 :sigma 1.0}
+     :fields [{:name "board" :type "Board"}
+              {:name "toMove" :type "Color"}
+              {:name "human" :type "Color"}]
+     :ops [{:name "play" :args ["square"] :returns "Game"}
+           {:name "undoTurn" :returns "Game"}
+           {:name "legalPositions" :returns "Square[]"}]}
+    {:id :board
+     :name "Board"
+     :crap {:mu 1.2 :max 2.0 :sigma 0.4}
+     :ops [{:name "place" :args ["square" "color"] :returns "Board"}
+           {:name "cell" :args ["square"] :returns "Color"}
+           {:name "opponent" :args ["color"] :returns "Color"}]}
+    {:id :rules
+     :name "Rules"
+     :crap {:mu 2.0 :max 5.0 :sigma 1.4}
+     :ops [{:name "flips" :args ["board" "color" "square"] :returns "Square[]"}
+           {:name "legalMoves" :args ["board" "color"] :returns "Square[]"}
+           {:name "winner" :args ["board"] :returns "Color"}]}
+    {:id :square
+     :name "Square"
+     :fields [{:name "row" :type "int"}
+              {:name "col" :type "int"}]}
+    {:id :color
+     :name "Color"
+     :stereotype :enumeration
+     :fields ["Black" "White" "Empty"]}]}]
+ :edges
+ [{:from :future-job :to :job-port :kind :implements}
+  {:from :timeout-job :to :job-port :kind :implements}
+  {:from :search-player :to :player :kind :implements}
+  {:from :desktop-app :to :host :kind :dependency}
+  {:from :desktop-app :to :painter :kind :dependency}
+  {:from :desktop-app :to :future-job :kind :dependency}
+  {:from :desktop-app :to :search-player :kind :dependency}
+  {:from :browser-app :to :host :kind :dependency}
+  {:from :browser-app :to :painter :kind :dependency}
+  {:from :browser-app :to :timeout-job :kind :dependency}
+  {:from :browser-app :to :search-player :kind :dependency}
+  {:from :painter :to :view-model :kind :dependency}
+  {:from :painter :to :layout :kind :dependency}
+  {:from :host :to :session :kind :association}
+  {:from :session :to :game :kind :association}
+  {:from :session :to :player :kind :association}
+  {:from :session :to :layout :kind :dependency}
+  {:from :session :to :anim :kind :dependency}
+  {:from :view-model :to :layout :kind :dependency}
+  {:from :view-model :to :anim :kind :dependency}
+  {:from :search-player :to :evaluator :kind :association}
+  {:from :search-player :to :rules :kind :dependency}
+  {:from :evaluator :to :board :kind :dependency}
+  {:from :evaluator :to :rules :kind :dependency}
+  {:from :game :to :board :kind :association}
+  {:from :game :to :rules :kind :dependency}
+  {:from :game :to :square :kind :association}
+  {:from :game :to :color :kind :association}
+  {:from :rules :to :board :kind :dependency}
+  {:from :board :to :color :kind :association}
+  {:from :board :to :square :kind :association}]}
