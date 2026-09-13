@@ -18,23 +18,25 @@
    (q/stroke-weight w)))
 
 (defn- arrowhead [kind [x y] [px py]]
+  ;; Mermaid class markers: long shallow chevron (half-angle ~19°), orient=auto.
   (let [ang (Math/atan2 (- y py) (- x px))
         size m/head-size
-        left (+ ang (/ Math/PI 6))
-        right (- ang (/ Math/PI 6))
+        half (/ Math/PI 9)
+        left (+ ang half)
+        right (- ang half)
         x1 (- x (* size (Math/cos left)))
         y1 (- y (* size (Math/sin left)))
         x2 (- x (* size (Math/cos right)))
         y2 (- y (* size (Math/sin right)))]
     (case kind
       :triangle (do
-                  (q/fill 22 28 32)
+                  (rgb theme/bg)
                   (q/stroke-weight 1.5)
                   (q/triangle x y x1 y1 x2 y2))
       :diamond (let [back (- ang Math/PI)
                      bx (+ x (* size (Math/cos back)))
                      by (+ y (* size (Math/sin back)))]
-                 (q/fill 22 28 32)
+                 (rgb theme/bg)
                  (q/quad x y x1 y1 bx by x2 y2))
       :diamond-fill (let [back (- ang Math/PI)
                           bx (+ x (* size (Math/cos back)))
@@ -45,56 +47,40 @@
         (q/line x y x1 y1)
         (q/line x y x2 y2)))))
 
-(defn- draw-dashed-line [a b]
-  (let [[x1 y1] a [x2 y2] b
-        dx (- x2 x1) dy (- y2 y1)
-        len (Math/hypot dx dy)
-        n (max 1 (int (/ len 10)))]
-    (dotimes [i n]
-      (when (even? i)
-        (let [t0 (/ i n)
-              t1 (/ (min (inc i) n) n)]
-          (q/line (+ x1 (* dx t0)) (+ y1 (* dy t0))
-                  (+ x1 (* dx t1)) (+ y1 (* dy t1))))))))
-
-(defn- draw-ops [start ops dashed?]
+(defn- draw-ops [start ops]
   (loop [cur start ops ops]
     (when (seq ops)
       (let [op (first ops)
-            nxt (if (= :quad (:op op)) (:p op) (:p op))]
+            nxt (:p op)]
         (case (:op op)
-          :line (if dashed?
-                  (draw-dashed-line cur (:p op))
-                  (q/line (first cur) (second cur)
-                          (first (:p op)) (second (:p op))))
-          :quad (if dashed?
-                  (do (draw-dashed-line cur (:c op))
-                      (draw-dashed-line (:c op) (:p op)))
-                  (let [c1 [(+ (first cur) (* 2/3 (- (first (:c op)) (first cur))))
-                            (+ (second cur) (* 2/3 (- (second (:c op)) (second cur))))]
-                        c2 [(+ (first (:p op)) (* 2/3 (- (first (:c op)) (first (:p op)))))
-                            (+ (second (:p op)) (* 2/3 (- (second (:c op)) (second (:p op)))))]]
-                    (q/bezier (first cur) (second cur)
-                              (first c1) (second c1)
-                              (first c2) (second c2)
-                              (first (:p op)) (second (:p op)))))
-          :cubic (if dashed?
-                   (draw-dashed-line cur (:p op))
-                   (q/bezier (first cur) (second cur)
-                             (first (:c1 op)) (second (:c1 op))
-                             (first (:c2 op)) (second (:c2 op))
-                             (first (:p op)) (second (:p op)))))
+          :line (q/line (first cur) (second cur)
+                        (first (:p op)) (second (:p op)))
+          :cubic (q/bezier (first cur) (second cur)
+                           (first (:c1 op)) (second (:c1 op))
+                           (first (:c2 op)) (second (:c2 op))
+                           (first (:p op)) (second (:p op)))
+          :quad (let [c1 [(+ (first cur) (* 2/3 (- (first (:c op)) (first cur))))
+                          (+ (second cur) (* 2/3 (- (second (:c op)) (second cur))))]
+                      c2 [(+ (first (:p op)) (* 2/3 (- (first (:c op)) (first (:p op)))))
+                          (+ (second (:p op)) (* 2/3 (- (second (:c op)) (second (:p op)))))]]
+                  (q/bezier (first cur) (second cur)
+                            (first c1) (second c1)
+                            (first c2) (second c2)
+                            (first (:p op)) (second (:p op)))))
         (recur nxt (rest ops))))))
 
-(defn- draw-edge [e selected?]
+(defn- draw-edge [e selected? scene]
   (let [pts (vec (:points e))]
     (when (next pts)
-      (stroke-rgb (if selected? theme/gold theme/muted) (if selected? 2.2 1.3))
+      (stroke-rgb (if selected? theme/gold theme/muted) (if selected? 2.2 1.4))
       (q/no-fill)
       (q/stroke-cap :round)
-      (let [path (curve/basis-path pts)
+      (let [from (hit/class-by-id scene (:from e))
+            to (hit/class-by-id scene (:to e))
+            path (-> (curve/basis-path pts)
+                     (curve/constrain-ends (:rect from) (:rect to)))
             [behind tip] (curve/end-tangent path)]
-        (draw-ops (:start path) (:ops path) (:dashed? e))
+        (draw-ops (:start path) (:ops path))
         (when (:head e)
           (arrowhead (:head e) tip behind))))))
 
@@ -212,7 +198,9 @@
         hover-id (when (= :class (get-in state [:hover :kind]))
                    (get-in state [:hover :id]))]
     (doseq [e (:edges (:scene state))]
-      (draw-edge e (or (= sel-id (:from e)) (= sel-id (:to e)))))
+      (draw-edge e
+                 (or (= sel-id (:from e)) (= sel-id (:to e)))
+                 (:scene state)))
     (doseq [c (remove :dummy? (:classes (:scene state)))]
       (draw-class c
                   (= sel-id (:id c))

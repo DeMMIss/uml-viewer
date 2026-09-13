@@ -92,8 +92,8 @@
       (should= 0 (:cam-y (events/on-scroll s :nope 900))))))
 
 (describe "document"
-  (it "stacks Othello layer diagrams top to bottom"
-    (let [scene (events/compile-document (ir/load-document "examples/othello.edn"))
+  (it "stacks layer diagrams top to bottom"
+    (let [scene (events/compile-document (ir/load-document "examples/uml-viewer.edn"))
           titles (map :title (:sections scene))]
-      (should= ["Domain" "AI" "UI application" "Adapters"] titles)
+      (should= ["Layers" "Domain" "Engine" "Application" "Adapters"] titles)
       (should (apply < (map :title-y (:sections scene)))))))

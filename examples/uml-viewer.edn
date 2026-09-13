@@ -1,0 +1,191 @@
+{:title "UML viewer"
+ :diagrams
+ [{:title "Layers"
+   :packages
+   [{:id :domain
+     :label "Domain"
+     :crap {:mu 3.5 :max 8.0 :sigma 2.4}
+     :classes
+     [{:id :ir :name "Ir" :crap {:mu 5.0 :max 8.0 :sigma 2.5}}
+      {:id :geom :name "Geom" :crap {:mu 1.8 :max 6.0 :sigma 1.6}}
+      {:id :metrics :name "Metrics" :crap {:mu 2.5 :max 4.0 :sigma 1.5}}
+      {:id :theme :name "Theme" :crap {:mu 5.0 :max 5.0 :sigma 0.0}}]}
+    {:id :engine
+     :label "Engine"
+     :crap {:mu 3.2 :max 12.0 :sigma 2.8}
+     :classes
+     [{:id :layout :name "Layout" :crap {:mu 4.0 :max 10.0 :sigma 3.0}}
+      {:id :route :name "Route" :crap {:mu 3.0 :max 8.0 :sigma 2.0}}
+      {:id :curve :name "Curve" :crap {:mu 5.7 :max 12.0 :sigma 4.5}}
+      {:id :compose :name "Compose" :crap {:mu 1.0 :max 1.0 :sigma 0.0}}
+      {:id :hit :name "Hit" :crap {:mu 1.8 :max 4.0 :sigma 1.3}}]}
+    {:id :app
+     :label "Application"
+     :crap {:mu 3.5 :max 9.0 :sigma 3.0}
+     :classes
+     [{:id :events :name "Events" :crap {:mu 3.5 :max 9.0 :sigma 3.0}}]}
+    {:id :adapters
+     :label "Adapters"
+     :crap {:mu 40.0 :max 178.0 :sigma 55.0}
+     :classes
+     [{:id :draw :name "Draw" :crap {:mu 50.0 :max 178.0 :sigma 55.0}}
+      {:id :sketch :name "Sketch" :crap {:mu 8.0 :max 19.5 :sigma 8.0}}
+      {:id :core :name "Core" :crap {:mu 5.4 :max 5.4 :sigma 0.0}}]}]
+   :edges
+   [{:from :layout :to :geom :kind :dependency}
+    {:from :layout :to :metrics :kind :dependency}
+    {:from :route :to :geom :kind :dependency}
+    {:from :route :to :metrics :kind :dependency}
+    {:from :compose :to :layout :kind :dependency}
+    {:from :compose :to :route :kind :dependency}
+    {:from :hit :to :geom :kind :dependency}
+    {:from :events :to :ir :kind :dependency}
+    {:from :events :to :compose :kind :dependency}
+    {:from :events :to :hit :kind :dependency}
+    {:from :draw :to :curve :kind :dependency}
+    {:from :draw :to :theme :kind :dependency}
+    {:from :draw :to :hit :kind :dependency}
+    {:from :sketch :to :draw :kind :dependency}
+    {:from :sketch :to :events :kind :dependency}
+    {:from :core :to :sketch :kind :dependency}]}
+
+  {:title "Domain"
+   :direction :lr
+   :packages
+   [{:id :domain
+     :label "Domain"
+     :crap {:mu 3.5 :max 8.0 :sigma 2.4}
+     :classes
+     [{:id :ir
+       :name "Ir"
+       :crap {:mu 5.0 :max 8.0 :sigma 2.5}
+       :ops [{:name "normalize" :args ["raw"] :returns "Diagram"}
+             {:name "load-document" :args ["path"] :returns "Document"}
+             {:name "load-diagram" :args ["path"] :returns "Diagram"}
+             {:name "read-diagram" :args ["edn"] :returns "Diagram"}]}
+      {:id :geom
+       :name "Geom"
+       :crap {:mu 1.8 :max 6.0 :sigma 1.6}
+       :ops [{:name "rect" :args ["x" "y" "w" "h"] :returns "Rect"}
+             {:name "inside?" :args ["r" "x" "y"] :returns "bool"}
+             {:name "intersect-rect" :args ["r" "outside"] :returns "Point"}
+             {:name "segment-hits-rect?" :args ["a" "b" "r"] :returns "bool"}
+             {:name "inflate" :args ["r" "pad"] :returns "Rect"}
+             {:name "union" :args ["rects"] :returns "Rect"}]}
+      {:id :metrics
+       :name "Metrics"
+       :crap {:mu 2.5 :max 4.0 :sigma 1.5}
+       :ops [{:name "text-w" :args ["s"] :returns "int"}
+             {:name "format-crap" :args ["crap"] :returns "String"}]}
+      {:id :theme
+       :name "Theme"
+       :crap {:mu 5.0 :max 5.0 :sigma 0.0}
+       :ops [{:name "fill-for" :args ["crap"] :returns "Rgb"}
+             {:name "stroke-for" :args ["crap"] :returns "Rgb"}]}]}]
+   :edges []}
+
+  {:title "Engine"
+   :direction :lr
+   :packages
+   [{:id :engine
+     :label "Engine"
+     :crap {:mu 3.2 :max 12.0 :sigma 2.8}
+     :classes
+     [{:id :layout
+       :name "Layout"
+       :crap {:mu 4.0 :max 10.0 :sigma 3.0}
+       :ops [{:name "layout" :args ["diagram"] :returns "Scene"}
+             {:name "class-box-size" :args ["class"] :returns "Size"}]}
+      {:id :route
+       :name "Route"
+       :crap {:mu 3.0 :max 8.0 :sigma 2.0}
+       :ops [{:name "route" :args ["scene"] :returns "Scene"}]}
+      {:id :curve
+       :name "Curve"
+       :crap {:mu 5.7 :max 12.0 :sigma 4.5}
+       :ops [{:name "basis-path" :args ["pts"] :returns "Path"}
+             {:name "end-tangent" :args ["path"] :returns "Segment"}]}
+      {:id :compose
+       :name "Compose"
+       :crap {:mu 1.0 :max 1.0 :sigma 0.0}
+       :ops [{:name "compile-document" :args ["doc"] :returns "Scene"}]}
+      {:id :hit
+       :name "Hit"
+       :crap {:mu 1.8 :max 4.0 :sigma 1.3}
+       :ops [{:name "at" :args ["scene" "x" "y"] :returns "Hit"}
+             {:name "class-by-id" :args ["scene" "id"] :returns "Class"}
+             {:name "package-by-id" :args ["scene" "id"] :returns "Package"}]}
+      {:id :geom :name "Geom"}
+      {:id :metrics :name "Metrics"}
+      {:id :ir :name "Ir"}]}]
+   :edges
+   [{:from :layout :to :geom :kind :dependency}
+    {:from :layout :to :metrics :kind :dependency}
+    {:from :route :to :geom :kind :dependency}
+    {:from :route :to :metrics :kind :dependency}
+    {:from :compose :to :layout :kind :association}
+    {:from :compose :to :route :kind :association}
+    {:from :compose :to :geom :kind :dependency}
+    {:from :hit :to :geom :kind :dependency}]}
+
+  {:title "Application"
+   :direction :lr
+   :packages
+   [{:id :app
+     :label "Application"
+     :crap {:mu 3.5 :max 9.0 :sigma 3.0}
+     :classes
+     [{:id :events
+       :name "Events"
+       :crap {:mu 3.5 :max 9.0 :sigma 3.0}
+       :ops [{:name "load-path" :args ["path"] :returns "State"}
+             {:name "maybe-reload" :args ["state"] :returns "State"}
+             {:name "on-press" :args ["state" "x" "y"] :returns "State"}
+             {:name "on-move" :args ["state" "x" "y"] :returns "State"}
+             {:name "on-scroll" :args ["state" "amount" "opts"] :returns "State"}
+             {:name "on-key" :args ["state" "k"] :returns "State"}
+             {:name "compile-document" :args ["doc"] :returns "Scene"}]}
+      {:id :compose :name "Compose"}
+      {:id :ir :name "Ir"}
+      {:id :hit :name "Hit"}
+      {:id :layout :name "Layout"}
+      {:id :route :name "Route"}]}]
+   :edges
+   [{:from :events :to :compose :kind :association}
+    {:from :events :to :ir :kind :dependency}
+    {:from :events :to :hit :kind :dependency}
+    {:from :events :to :layout :kind :dependency}
+    {:from :events :to :route :kind :dependency}]}
+
+  {:title "Adapters"
+   :direction :lr
+   :packages
+   [{:id :adapters
+     :label "Adapters"
+     :crap {:mu 40.0 :max 178.0 :sigma 55.0}
+     :classes
+     [{:id :draw
+       :name "Draw"
+       :crap {:mu 50.0 :max 178.0 :sigma 55.0}
+       :ops [{:name "draw-state" :args ["state"]}]}
+      {:id :sketch
+       :name "Sketch"
+       :crap {:mu 8.0 :max 19.5 :sigma 8.0}
+       :ops [{:name "start!" :args ["path"]}
+             {:name "setup" :args ["path"] :returns "State"}
+             {:name "update-state" :args ["state"] :returns "State"}]}
+      {:id :core
+       :name "Core"
+       :crap {:mu 5.4 :max 5.4 :sigma 0.0}
+       :ops [{:name "-main" :args ["args"]}]}
+      {:id :events :name "Events"}
+      {:id :curve :name "Curve"}
+      {:id :theme :name "Theme"}
+      {:id :hit :name "Hit"}]}]
+   :edges
+   [{:from :core :to :sketch :kind :association}
+    {:from :sketch :to :draw :kind :dependency}
+    {:from :sketch :to :events :kind :dependency}
+    {:from :draw :to :curve :kind :dependency}
+    {:from :draw :to :theme :kind :dependency}
+    {:from :draw :to :hit :kind :dependency}]}]}

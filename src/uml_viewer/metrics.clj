@@ -9,7 +9,7 @@
 (def rank-gap 80)
 (def class-rank-gap 140)
 (def margin 40)
-(def head-size 12)
+(def head-size 16)
 (def lane-gap 10)
 
 (defn text-w [s]

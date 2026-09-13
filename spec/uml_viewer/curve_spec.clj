@@ -1,7 +1,10 @@
 (ns uml-viewer.curve-spec
   (:require [speclj.core :refer :all]
             [uml-viewer.curve :as curve]
-            [uml-viewer.layout :as layout]))
+            [uml-viewer.geom :as geom]
+            [uml-viewer.ir :as ir]
+            [uml-viewer.layout :as layout]
+            [uml-viewer.route :as route]))
 
 (describe "class box sizing"
   (it "grows with the longest text line"
@@ -23,14 +26,71 @@
     (should= :line (:op (first (:ops (curve/basis-path [[0 0] [1 1]]))))))
 
   (it "emits cubics for a polyline with elbows"
-    (let [path (curve/basis-path [[0 0] [0 48] [80 48] [80 96] [160 96] [160 120]])
+    (let [pts [[0 0] [0 48] [80 48] [80 96] [160 96] [160 120]]
+          path (curve/basis-path pts)
           ops (:ops path)]
       (should= [0 0] (:start path))
       (should (some #(= :cubic (:op %)) ops))
-      (should= :line (:op (last ops)))))
+      (should= :cubic (:op (last ops)))
+      (should= (mapv double (last pts)) (:p (last ops)))))
 
   (it "reports an end tangent from the last stroke, not a forced stub"
     (let [path (curve/basis-path [[0 0] [0 40] [80 40] [80 80]])
           [behind tip] (curve/end-tangent path)]
       (should= [80.0 80.0] (mapv double tip))
-      (should-not= behind tip))))
+      (should-not= behind tip)))
+
+  (it "orients the end tangent along the spline, not the last elbow"
+    (let [path (curve/basis-path [[0 0] [40 0] [40 80] [120 80]])
+          [behind tip] (curve/end-tangent path)
+          dx (- (first tip) (first behind))
+          dy (- (second tip) (second behind))]
+      (should= [120.0 80.0] (mapv double tip))
+      (should (> (abs dy) 1.0))
+      (should (> (abs dx) 1.0))))
+
+  (it "lifts a shallow end tangent to 45 degrees from the class edge"
+    (let [box (geom/rect 40 360 80 80)
+          path (curve/basis-path [[0 0] [10 0] [10 400] [40 400]])
+          constrained (curve/constrain-ends path nil box)
+          [behind tip] (curve/end-tangent constrained)
+          dx (- (first tip) (first behind))
+          dy (- (second tip) (second behind))]
+      (should= [40.0 400.0] (mapv double tip))
+      (should (>= (+ (abs dx) 0.01) (abs dy)))))
+
+  (it "leaves a steep end tangent alone"
+    (let [box (geom/rect 120 40 40 80)
+          path (curve/basis-path [[0 40] [60 80] [120 80]])
+          raw (curve/end-tangent path)
+          constrained (curve/end-tangent (curve/constrain-ends path nil box))]
+      (should= (mapv double (second raw)) (mapv double (second constrained)))))
+
+  (it "meets class edges at 45 degrees or steeper"
+    (let [scene (route/route (layout/layout
+                              (ir/normalize
+                                {:direction :lr
+                                 :packages [{:id :p :label "P"
+                                             :classes [{:id :hub :name "Hub"}
+                                                       {:id :a :name "A"}
+                                                       {:id :b :name "B"}
+                                                       {:id :c :name "C"}
+                                                       {:id :d :name "D"}
+                                                       {:id :e :name "E"}]}]
+                                 :edges [{:from :hub :to :a :kind :association}
+                                         {:from :hub :to :b :kind :association}
+                                         {:from :hub :to :c :kind :association}
+                                         {:from :hub :to :d :kind :association}
+                                         {:from :hub :to :e :kind :association}]})))]
+      (doseq [e (:edges scene)
+              :let [from (first (filter #(= (:id %) (:from e)) (:classes scene)))
+                    to (first (filter #(= (:id %) (:to e)) (:classes scene)))
+                    path (curve/constrain-ends (curve/basis-path (:points e))
+                                               (:rect from) (:rect to))
+                    [behind tip] (curve/end-tangent path)
+                    dx (- (first tip) (first behind))
+                    dy (- (second tip) (second behind))
+                    face (curve/face-of (:rect to) tip)
+                    along (if (#{:left :right} face) (abs dy) (abs dx))
+                    across (if (#{:left :right} face) (abs dx) (abs dy))]]
+        (should (>= (+ across 0.01) along))))))

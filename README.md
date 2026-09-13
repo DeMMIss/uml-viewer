@@ -64,20 +64,22 @@ Edge `:kind` values:
 
 | kind | line | head |
 |------|------|------|
-| `:inheritance` | solid | empty triangle |
-| `:implements` | dashed | empty triangle |
-| `:association` | solid | open arrow |
-| `:dependency` | dashed | open arrow |
-| `:aggregation` | solid | empty diamond |
-| `:composition` | solid | filled diamond |
+| `:inheritance` | solid grey | empty triangle |
+| `:implements` | solid grey | empty triangle |
+| `:association` | solid grey | open arrow |
+| `:dependency` | solid grey | open arrow |
+| `:aggregation` | solid grey | empty diamond |
+| `:composition` | solid grey | filled diamond |
 
 Layout follows Mermaid's three stages:
 
 1. **Size** each class from its text (padding 12).
 2. **Place** with a layered graph (packages in ranks; classes Sugiyama-ranked
    inside a package; ~40px spacing).
-3. **Route** in rank channels (one track per edge), then stroke with D3
-   `curveBasis` cubics.
+3. **Route** like Mermaid/ELK: ports on facing sides, orthogonal tracks in
+   the rank gap, short same-rank connections through the stack gap (local U
+   only when a sibling sits in the way), then stroke with D3 `curveBasis`
+   cubics. All arrows are solid grey.
 
 The engine (`ir`, `layout`, `route`, `hit`, `events`) does not depend on Quil.
 Only `draw` and `sketch` talk to Processing.

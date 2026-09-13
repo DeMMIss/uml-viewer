@@ -1,5 +1,6 @@
 (ns uml-viewer.layout-spec
   (:require [speclj.core :refer :all]
+            [uml-viewer.curve :as curve]
             [uml-viewer.geom :as geom]
             [uml-viewer.ir :as ir]
             [uml-viewer.layout :as layout]
@@ -16,14 +17,29 @@
        :classes [{:id :child :name "Child"}]}]
      :edges [{:from :child :to :parent :kind :implements}]}))
 
+(def hub
+  (ir/normalize
+    {:direction :lr
+     :packages [{:id :p :label "P"
+                 :classes [{:id :hub :name "Hub"}
+                           {:id :a :name "A"}
+                           {:id :b :name "B"}
+                           {:id :c :name "C"}
+                           {:id :d :name "D"}
+                           {:id :e :name "E"}]}]
+     :edges [{:from :hub :to :a :kind :association}
+             {:from :hub :to :b :kind :association}
+             {:from :hub :to :c :kind :association}
+             {:from :hub :to :d :kind :association}
+             {:from :hub :to :e :kind :association}]}))
+
 (describe "layout"
-  (it "lays Domain out left-to-right with Game as the hub"
-    (let [scene (layout/layout (ir/load-diagram "examples/othello.edn"))
-          game (first (filter #(= :game (:id %)) (:classes scene)))
-          targets (filter #(#{:board :rules :color :square :move} (:id %))
-                          (:classes scene))]
+  (it "lays an LR hub to the left of its targets"
+    (let [scene (layout/layout hub)
+          h (first (filter #(= :hub (:id %)) (:classes scene)))
+          targets (filter #(#{:a :b :c :d :e} (:id %)) (:classes scene))]
       (should= 5 (count targets))
-      (should (every? #(< (geom/cx (:rect game)) (geom/cx (:rect %))) targets))))
+      (should (every? #(< (geom/cx (:rect h)) (geom/cx (:rect %))) targets))))
 
   (it "puts the parent package above the implementing child"
     (let [scene (layout/layout sample)
@@ -76,19 +92,54 @@
           end (last (:points e))]
       (should (geom/inside? (geom/inflate (:rect child) 1) start))
       (should (geom/inside? (geom/inflate (:rect parent) 1) end))
-      (should= :triangle (:head e))
-      (should (:dashed? e))))
+      (should= :triangle (:head e))))
 
-  (it "gives Game's five arrows distinct channel waypoints"
-    (let [scene (route/route (layout/layout (ir/load-diagram "examples/othello.edn")))
-          outs (filter #(= :game (:from %)) (:edges scene))
+  (it "gives a hub's five arrows distinct channel waypoints"
+    (let [scene (route/route (layout/layout hub))
+          outs (filter #(= :hub (:from %)) (:edges scene))
           mids (map (fn [e] (mapv #(Math/round (double %)) (second (:points e))))
                     outs)]
       (should= 5 (count outs))
       (should= 5 (count (distinct mids)))))
 
+  (it "does not reverse at the start of a long same-rank detour"
+    (let [d (ir/normalize
+              {:direction :lr
+               :packages [{:id :p :label "P"
+                           :classes [{:id :hub :name "Hub"}
+                                     {:id :a :name "Above"}
+                                     {:id :mid :name "Middle"}
+                                     {:id :b :name "Below"}]}]
+               :edges [{:from :hub :to :a :kind :association}
+                       {:from :hub :to :mid :kind :association}
+                       {:from :hub :to :b :kind :association}
+                       {:from :a :to :b :kind :association}]})
+          scene (route/route (layout/layout d))
+          e (first (filter #(and (= :a (:from %)) (= :b (:to %)))
+                           (:edges scene)))
+          a (first (filter #(= :a (:id %)) (:classes scene)))
+          b (first (filter #(= :b (:id %)) (:classes scene)))
+          p0 (first (:points e))
+          p1 (second (:points e))
+          down? (> (geom/cy (:rect b)) (geom/cy (:rect a)))]
+      (if down?
+        (should (>= (- (second p1) (second p0)) -0.51))
+        (should (<= (- (second p1) (second p0)) 0.51)))))
+
+  (it "does not start or end two arrows at the same point on a class"
+    (let [scene (route/route (layout/layout hub))
+          round (fn [p] (mapv #(Math/round (double %)) p))
+          starts (map (fn [e] [(:from e) (round (first (:points e)))])
+                      (:edges scene))
+          ends (map (fn [e] [(:to e) (round (last (:points e)))])
+                    (:edges scene))]
+      (doseq [group (vals (group-by first starts))]
+        (should= (count group) (count (distinct (map second group)))))
+      (doseq [group (vals (group-by first ends))]
+        (should= (count group) (count (distinct (map second group)))))))
+
   (it "does not run segments through other classes"
-    (let [scene (route/route (layout/layout (ir/load-diagram "examples/othello.edn")))]
+    (let [scene (route/route (layout/layout hub))]
       (doseq [e (:edges scene)
               [a b] (partition 2 1 (:points e))
               c (:classes scene)
@@ -96,20 +147,59 @@
                          (not= (:id c) (:to e)))]
         (should-not (geom/segment-hits-rect? a b (:rect c))))))
 
-  (it "aims the last segment at the class center, not along a face"
-    (let [scene (route/route (layout/layout (ir/load-diagram "examples/othello.edn")))
-          e (first (filter #(= :game (:from %)) (:edges scene)))
-          to (first (filter #(= (:to e) (:id %)) (:classes scene)))
-          a (last (butlast (:points e)))
-          b (last (:points e))
-          cx (geom/cx (:rect to))
-          cy (geom/cy (:rect to))
-          ;; last chord and center-to-end should be nearly collinear
-          dot (let [dx1 (- (first b) (first a))
-                    dy1 (- (second b) (second a))
-                    dx2 (- cx (first b))
-                    dy2 (- cy (second b))
-                    n1 (Math/hypot dx1 dy1)
-                    n2 (Math/hypot dx2 dy2)]
-                (/ (+ (* dx1 dx2) (* dy1 dy2)) (* n1 n2)))]
-      (should (> dot 0.85)))))
+  (it "routes a stacked same-rank pair through the gap, not around the column"
+    (let [d (ir/normalize
+              {:direction :lr
+               :packages [{:id :p :label "P"
+                           :classes [{:id :hub :name "Hub"}
+                                     {:id :a :name "Above"}
+                                     {:id :b :name "Below"}]}]
+               :edges [{:from :hub :to :a :kind :association}
+                       {:from :hub :to :b :kind :association}
+                       {:from :a :to :b :kind :association}]})
+          scene (route/route (layout/layout d))
+          e (first (filter #(= #{:a :b} #{(:from %) (:to %)}) (:edges scene)))
+          a (first (filter #(= :a (:id %)) (:classes scene)))
+          b (first (filter #(= :b (:id %)) (:classes scene)))
+          xs (map first (:points e))
+          pair-left (min (:x (:rect a)) (:x (:rect b)))
+          pair-right (max (geom/right (:rect a)) (geom/right (:rect b)))]
+      (should (every? #(<= pair-left % pair-right) xs))))
+
+  (it "detours a blocked same-rank edge around the pair instead of the whole rank"
+    (let [d (ir/normalize
+              {:direction :lr
+               :packages [{:id :p :label "P"
+                           :classes [{:id :hub :name "Hub"}
+                                     {:id :a :name "Above"}
+                                     {:id :mid :name "Middle"}
+                                     {:id :b :name "Below"}]}]
+               :edges [{:from :hub :to :a :kind :association}
+                       {:from :hub :to :mid :kind :association}
+                       {:from :hub :to :b :kind :association}
+                       {:from :a :to :b :kind :association}]})
+          scene (route/route (layout/layout d))
+          e (first (filter #(= #{:a :b} #{(:from %) (:to %)}) (:edges scene)))
+          a (first (filter #(= :a (:id %)) (:classes scene)))
+          b (first (filter #(= :b (:id %)) (:classes scene)))
+          mid (first (filter #(= :mid (:id %)) (:classes scene)))
+          pack (first (:packages scene))
+          xs (map first (:points e))
+          pair-right (max (geom/right (:rect a)) (geom/right (:rect b)))]
+      (doseq [[p q] (partition 2 1 (:points e))]
+        (should-not (geom/segment-hits-rect? p q (:rect mid))))
+      (should (< (apply max xs) (+ pair-right (* 4 10))))
+      (should (< (apply max xs) (geom/right (:rect pack))))))
+
+  (it "does not dash any edge"
+    (let [scene (route/route (layout/layout hub))]
+      (should (every? #(nil? (:dashed? %)) (:edges scene)))))
+
+  (it "ends the basis stroke on the last waypoint so the head follows the spline"
+    (let [path (curve/basis-path [[0 0] [40 0] [40 80] [120 80]])
+          last-op (last (:ops path))
+          [behind tip] (curve/end-tangent path)]
+      (should= :cubic (:op last-op))
+      (should= [120.0 80.0] (:p last-op))
+      (should= [120.0 80.0] (mapv double tip))
+      (should (> (abs (- (second tip) (second behind))) 1.0)))))

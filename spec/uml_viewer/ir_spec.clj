@@ -79,8 +79,8 @@
   (it "reads a diagram from an EDN string"
     (should= "Tiny" (:title (ir/read-diagram "{:title \"Tiny\" :packages [{:id :p :label \"P\" :classes [{:id :a :name \"A\"}]}] :edges []}"))))
 
-  (it "loads the Othello document as layer diagrams"
-    (let [doc (ir/load-document "examples/othello.edn")]
-      (should= "Othello" (:title doc))
-      (should= ["Domain" "AI" "UI application" "Adapters"]
+  (it "loads the viewer document as layer diagrams"
+    (let [doc (ir/load-document "examples/uml-viewer.edn")]
+      (should= "UML viewer" (:title doc))
+      (should= ["Layers" "Domain" "Engine" "Application" "Adapters"]
                (map :title (:diagrams doc))))))
