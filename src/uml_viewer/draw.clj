@@ -18,7 +18,7 @@
 
 (defn- arrowhead [kind [x y] [px py]]
   (let [ang (Math/atan2 (- y py) (- x px))
-        size 12
+        size m/head-size
         left (+ ang (/ Math/PI 6))
         right (- ang (/ Math/PI 6))
         x1 (- x (* size (Math/cos left)))

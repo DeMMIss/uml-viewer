@@ -8,6 +8,8 @@
 (def pack-gap 28)
 (def rank-gap 72)
 (def margin 40)
+(def head-size 12)
+(def stub-len (* 2 head-size))
 
 (defn text-w [s]
   (* char-w (count (or s ""))))

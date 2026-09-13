@@ -3,6 +3,7 @@
             [uml-viewer.geom :as geom]
             [uml-viewer.ir :as ir]
             [uml-viewer.layout :as layout]
+            [uml-viewer.metrics :as m]
             [uml-viewer.route :as route]))
 
 (def sample
@@ -51,6 +52,9 @@
                  (< (:y ar) (geom/bottom br))
                  (< (:y br) (geom/bottom ar)))))))))
 
+(defn- seg-len [[ax ay] [bx by]]
+  (Math/hypot (- bx ax) (- by ay)))
+
 (describe "routing"
   (it "starts and ends on the class boxes"
     (let [scene (route/route (layout/layout sample))
@@ -62,4 +66,31 @@
       (should (geom/inside? (geom/inflate (:rect child) 1) start))
       (should (geom/inside? (geom/inflate (:rect parent) 1) end))
       (should= :triangle (:head e))
-      (should (:dashed? e)))))
+      (should (:dashed? e))))
+
+  (it "points the last segment into the target, not along its edge"
+    (let [scene (route/route (layout/layout (ir/load-diagram "examples/othello.edn")))]
+      (doseq [e (:edges scene)]
+        (let [to (first (filter #(= (:to e) (:id %)) (:classes scene)))
+              pts (vec (:points e))
+              a (nth pts (- (count pts) 2))
+              b (last pts)
+              [ax ay] a [bx by] b
+              dx (- bx ax) dy (- by ay)
+              r (:rect to)
+              on-top (< (abs (- by (:y r))) 0.51)
+              on-bot (< (abs (- by (geom/bottom r))) 0.51)
+              on-left (< (abs (- bx (:x r))) 0.51)
+              on-right (< (abs (- bx (geom/right r))) 0.51)]
+          (should (>= (seg-len a b) m/stub-len))
+          (should-not (geom/inside? r a))
+          (should (geom/inside? (geom/inflate r 1) b))
+          (should (or on-top on-bot on-left on-right))
+          (cond
+            (or on-top on-bot) (should (< (abs dx) 0.51))
+            :else (should (< (abs dy) 0.51)))
+          (cond
+            on-top (should (pos? dy))
+            on-bot (should (neg? dy))
+            on-left (should (pos? dx))
+            on-right (should (neg? dx))))))))
