@@ -1,8 +1,10 @@
 (ns uml-viewer.sketch
-  (:require [quil.core :as q]
+  (:require [quil.applet :as applet]
+            [quil.core :as q]
             [quil.middleware :as m]
             [uml-viewer.draw :as draw]
-            [uml-viewer.events :as events]))
+            [uml-viewer.events :as events])
+  (:import [processing.event MouseEvent]))
 
 (def window-width 1500)
 (def window-height 920)
@@ -26,13 +28,21 @@
     :draw draw/draw-state
     :mouse-pressed (fn [state event]
                      (events/on-press state (:x event) (:y event)))
-    :mouse-dragged (fn [state event]
-                     (events/on-drag state (:x event) (:y event)))
-    :mouse-released (fn [state _]
-                      (events/on-release state))
     :mouse-moved (fn [state event]
                    (events/on-move state (:x event) (:y event)))
+    :mouse-wheel (fn [state event]
+                   (let [shift? (boolean
+                                  (or (when (instance? MouseEvent event)
+                                        (.isShiftDown ^MouseEvent event))
+                                      (try (.isShiftDown ^MouseEvent
+                                                         (.-mouseEvent (applet/current-applet)))
+                                           (catch Exception _ false))))]
+                     (events/on-scroll state event
+                                       {:horizontal? shift?
+                                        :window-w (q/width)
+                                        :window-h (q/height)})))
     :key-pressed (fn [state event]
-                   (events/on-key state (:key event)))
+                   (events/on-key state (:key event)
+                                 {:window-w (q/width) :window-h (q/height)}))
     :middleware [m/fun-mode]
     :features [:keep-on-top]))

@@ -3,7 +3,6 @@
             [uml-viewer.geom :as geom]
             [uml-viewer.ir :as ir]
             [uml-viewer.layout :as layout]
-            [uml-viewer.metrics :as m]
             [uml-viewer.route :as route]))
 
 (def sample
@@ -18,11 +17,13 @@
      :edges [{:from :child :to :parent :kind :implements}]}))
 
 (describe "layout"
-  (it "stacks Othello adapters above the domain"
+  (it "lays Domain out left-to-right with Game as the hub"
     (let [scene (layout/layout (ir/load-diagram "examples/othello.edn"))
-          adapters (first (filter #(= :adapters (:id %)) (:packages scene)))
-          domain (first (filter #(= :domain (:id %)) (:packages scene)))]
-      (should (< (:y (:rect adapters)) (:y (:rect domain))))))
+          game (first (filter #(= :game (:id %)) (:classes scene)))
+          targets (filter #(#{:board :rules :color :square :move} (:id %))
+                          (:classes scene))]
+      (should= 5 (count targets))
+      (should (every? #(< (geom/cx (:rect game)) (geom/cx (:rect %))) targets))))
 
   (it "puts the parent package above the implementing child"
     (let [scene (layout/layout sample)
@@ -52,10 +53,20 @@
                  (< (:y ar) (geom/bottom br))
                  (< (:y br) (geom/bottom ar)))))))))
 
-(defn- seg-len [[ax ay] [bx by]]
-  (Math/hypot (- bx ax) (- by ay)))
-
 (describe "routing"
+  (it "marks each edge kind with the matching head"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :a :name "A"} {:id :b :name "B"}]}]
+               :edges [{:from :a :to :b :kind :association}
+                       {:from :a :to :b :kind :dependency}
+                       {:from :a :to :b :kind :aggregation}
+                       {:from :a :to :b :kind :composition}
+                       {:from :a :to :b :kind :inheritance}]})
+          heads (map :head (:edges (route/route (layout/layout d))))]
+      (should= [:open :open :diamond :diamond-fill :triangle] heads)))
+
   (it "starts and ends on the class boxes"
     (let [scene (route/route (layout/layout sample))
           e (first (:edges scene))
@@ -68,29 +79,37 @@
       (should= :triangle (:head e))
       (should (:dashed? e))))
 
-  (it "points the last segment into the target, not along its edge"
+  (it "gives Game's five arrows distinct channel waypoints"
+    (let [scene (route/route (layout/layout (ir/load-diagram "examples/othello.edn")))
+          outs (filter #(= :game (:from %)) (:edges scene))
+          mids (map (fn [e] (mapv #(Math/round (double %)) (second (:points e))))
+                    outs)]
+      (should= 5 (count outs))
+      (should= 5 (count (distinct mids)))))
+
+  (it "does not run segments through other classes"
     (let [scene (route/route (layout/layout (ir/load-diagram "examples/othello.edn")))]
-      (doseq [e (:edges scene)]
-        (let [to (first (filter #(= (:to e) (:id %)) (:classes scene)))
-              pts (vec (:points e))
-              a (nth pts (- (count pts) 2))
-              b (last pts)
-              [ax ay] a [bx by] b
-              dx (- bx ax) dy (- by ay)
-              r (:rect to)
-              on-top (< (abs (- by (:y r))) 0.51)
-              on-bot (< (abs (- by (geom/bottom r))) 0.51)
-              on-left (< (abs (- bx (:x r))) 0.51)
-              on-right (< (abs (- bx (geom/right r))) 0.51)]
-          (should (>= (seg-len a b) m/stub-len))
-          (should-not (geom/inside? r a))
-          (should (geom/inside? (geom/inflate r 1) b))
-          (should (or on-top on-bot on-left on-right))
-          (cond
-            (or on-top on-bot) (should (< (abs dx) 0.51))
-            :else (should (< (abs dy) 0.51)))
-          (cond
-            on-top (should (pos? dy))
-            on-bot (should (neg? dy))
-            on-left (should (pos? dx))
-            on-right (should (neg? dx))))))))
+      (doseq [e (:edges scene)
+              [a b] (partition 2 1 (:points e))
+              c (:classes scene)
+              :when (and (not= (:id c) (:from e))
+                         (not= (:id c) (:to e)))]
+        (should-not (geom/segment-hits-rect? a b (:rect c))))))
+
+  (it "aims the last segment at the class center, not along a face"
+    (let [scene (route/route (layout/layout (ir/load-diagram "examples/othello.edn")))
+          e (first (filter #(= :game (:from %)) (:edges scene)))
+          to (first (filter #(= (:to e) (:id %)) (:classes scene)))
+          a (last (butlast (:points e)))
+          b (last (:points e))
+          cx (geom/cx (:rect to))
+          cy (geom/cy (:rect to))
+          ;; last chord and center-to-end should be nearly collinear
+          dot (let [dx1 (- (first b) (first a))
+                    dy1 (- (second b) (second a))
+                    dx2 (- cx (first b))
+                    dy2 (- cy (second b))
+                    n1 (Math/hypot dx1 dy1)
+                    n2 (Math/hypot dx2 dy2)]
+                (/ (+ (* dx1 dx2) (* dy1 dy2)) (* n1 n2)))]
+      (should (> dot 0.85)))))

@@ -6,4 +6,4 @@
   (let [path (or (first args) "examples/library.edn")]
     (sketch/start! path)
     (println "Watching" path)
-    (println "Click a class. Drag empty space to pan. R reloads.")))
+    (println "Click a class. Scroll to pan (Shift-scroll for horizontal). R reloads.")))

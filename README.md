@@ -14,17 +14,22 @@ clj -M:run examples/library.edn
 ```
 
 - Click a class or package to inspect it.
-- Drag empty space to pan.
+- Scroll the mouse wheel to pan vertically; Shift-scroll (or left/right arrows) for horizontal.
 - `R` reloads the EDN file from disk (the watcher also reloads on save).
 - `Esc` clears the selection.
 
 ```bash
 clj -M:spec
+clj -M:cov
+clj -M:crap
+clj -M:mutate src/uml_viewer/layout.clj
 ```
 
 ## IR
 
-The file is EDN. Unique class `:id`s, packages as groups, edges by kind.
+The file is EDN. A document may contain several diagrams (one per layer),
+stacked top to bottom. Unique class `:id`s *within* a diagram; packages as
+groups; edges by kind. A single diagram (top-level `:packages`) still works.
 
 ```edn
 {:title "Lending library"
@@ -66,9 +71,13 @@ Edge `:kind` values:
 | `:aggregation` | solid | empty diamond |
 | `:composition` | solid | filled diamond |
 
-Layout is Sugiyama-lite: implementing/inheriting packages sit below their
-parents; classes pack left-to-right inside a package; arrows are orthogonal
-elbows.
+Layout follows Mermaid's three stages:
+
+1. **Size** each class from its text (padding 12).
+2. **Place** with a layered graph (packages in ranks; classes Sugiyama-ranked
+   inside a package; ~40px spacing).
+3. **Route** in rank channels (one track per edge), then stroke with D3
+   `curveBasis` cubics.
 
 The engine (`ir`, `layout`, `route`, `hit`, `events`) does not depend on Quil.
 Only `draw` and `sketch` talk to Processing.

@@ -36,7 +36,51 @@
       (should= 3 (count (:packages d)))
       (should (seq (:edges d)))))
 
-  (it "loads the Othello diagram"
-    (let [d (ir/load-diagram "examples/othello.edn")]
-      (should= "Othello" (:title d))
-      (should= 4 (count (:packages d))))))
+  (it "builds member text from name, args, type, and returns"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :a :name "A"
+                            :fields [{:name "n" :type "int"}]
+                            :ops [{:name "go" :args ["x"] :returns "void"}]}]}]
+               :edges []})
+          c (get-in d [:packages 0 :classes 0])]
+      (should= "n : int" (get-in c [:fields 0 :text]))
+      (should= "go(x) : void" (get-in c [:ops 0 :text]))))
+
+  (it "accepts symbol ids and :sd as sigma"
+    (let [d (ir/normalize
+              {:packages
+               [{:id 'dom :label "D"
+                 :crap {:mu 1 :sd 0.2}
+                 :classes [{:id 'a :name "A"}]}]
+               :edges []})]
+      (should= :dom (get-in d [:packages 0 :id]))
+      (should= 0.2 (get-in d [:packages 0 :crap :sigma]))))
+
+  (it "defaults title and direction"
+    (let [d (ir/normalize
+              {:packages [{:id :p :label "P" :classes [{:id :a :name "A"}]}]
+               :edges []})]
+      (should= "UML" (:title d))
+      (should= :tb (:direction d))))
+
+  (it "rejects malformed ids, crap, members, classes, packages, and edges"
+    (should-throw (ir/normalize {:packages [{:id 1 :label "P" :classes [{:id :a :name "A"}]}]}))
+    (should-throw (ir/normalize {:packages [{:id :p :label "P" :crap "bad"
+                                            :classes [{:id :a :name "A"}]}]}))
+    (should-throw (ir/normalize {:packages [{:id :p :label "P"
+                                            :classes [{:id :a :name "A" :fields [1]}]}]}))
+    (should-throw (ir/normalize {:packages [{:id :p :label "P" :classes [{}]}]}))
+    (should-throw (ir/normalize {:packages [{}]}))
+    (should-throw (ir/normalize {:packages [{:id :p :label "P" :classes [{:id :a :name "A"}]}]
+                                :edges [{}]})))
+
+  (it "reads a diagram from an EDN string"
+    (should= "Tiny" (:title (ir/read-diagram "{:title \"Tiny\" :packages [{:id :p :label \"P\" :classes [{:id :a :name \"A\"}]}] :edges []}"))))
+
+  (it "loads the Othello document as layer diagrams"
+    (let [doc (ir/load-document "examples/othello.edn")]
+      (should= "Othello" (:title doc))
+      (should= ["Domain" "AI" "UI application" "Adapters"]
+               (map :title (:diagrams doc))))))

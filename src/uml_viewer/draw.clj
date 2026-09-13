@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [quil.core :as q]
             [uml-viewer.geom :as geom]
+            [uml-viewer.curve :as curve]
             [uml-viewer.hit :as hit]
             [uml-viewer.metrics :as m]
             [uml-viewer.theme :as theme]))
@@ -44,31 +45,58 @@
         (q/line x y x1 y1)
         (q/line x y x2 y2)))))
 
-(defn- draw-polyline [pts dashed?]
-  (when (next pts)
-    (when dashed?
-      (q/stroke-cap :round))
-    (doseq [[a b] (partition 2 1 pts)]
-      (if dashed?
-        (let [[x1 y1] a [x2 y2] b
-              dx (- x2 x1) dy (- y2 y1)
-              len (Math/hypot dx dy)
-              n (max 1 (int (/ len 10)))]
-          (dotimes [i n]
-            (when (even? i)
-              (let [t0 (/ i n)
-                    t1 (/ (min (inc i) n) n)]
-                (q/line (+ x1 (* dx t0)) (+ y1 (* dy t0))
-                        (+ x1 (* dx t1)) (+ y1 (* dy t1)))))))
-        (q/line (first a) (second a) (first b) (second b))))))
+(defn- draw-dashed-line [a b]
+  (let [[x1 y1] a [x2 y2] b
+        dx (- x2 x1) dy (- y2 y1)
+        len (Math/hypot dx dy)
+        n (max 1 (int (/ len 10)))]
+    (dotimes [i n]
+      (when (even? i)
+        (let [t0 (/ i n)
+              t1 (/ (min (inc i) n) n)]
+          (q/line (+ x1 (* dx t0)) (+ y1 (* dy t0))
+                  (+ x1 (* dx t1)) (+ y1 (* dy t1))))))))
+
+(defn- draw-ops [start ops dashed?]
+  (loop [cur start ops ops]
+    (when (seq ops)
+      (let [op (first ops)
+            nxt (if (= :quad (:op op)) (:p op) (:p op))]
+        (case (:op op)
+          :line (if dashed?
+                  (draw-dashed-line cur (:p op))
+                  (q/line (first cur) (second cur)
+                          (first (:p op)) (second (:p op))))
+          :quad (if dashed?
+                  (do (draw-dashed-line cur (:c op))
+                      (draw-dashed-line (:c op) (:p op)))
+                  (let [c1 [(+ (first cur) (* 2/3 (- (first (:c op)) (first cur))))
+                            (+ (second cur) (* 2/3 (- (second (:c op)) (second cur))))]
+                        c2 [(+ (first (:p op)) (* 2/3 (- (first (:c op)) (first (:p op)))))
+                            (+ (second (:p op)) (* 2/3 (- (second (:c op)) (second (:p op)))))]]
+                    (q/bezier (first cur) (second cur)
+                              (first c1) (second c1)
+                              (first c2) (second c2)
+                              (first (:p op)) (second (:p op)))))
+          :cubic (if dashed?
+                   (draw-dashed-line cur (:p op))
+                   (q/bezier (first cur) (second cur)
+                             (first (:c1 op)) (second (:c1 op))
+                             (first (:c2 op)) (second (:c2 op))
+                             (first (:p op)) (second (:p op)))))
+        (recur nxt (rest ops))))))
 
 (defn- draw-edge [e selected?]
-  (let [pts (:points e)]
-    (stroke-rgb (if selected? theme/gold theme/muted) (if selected? 2.2 1.3))
-    (q/no-fill)
-    (draw-polyline pts (:dashed? e))
-    (when (and (next pts) (:head e))
-      (arrowhead (:head e) (last pts) (last (butlast pts))))))
+  (let [pts (vec (:points e))]
+    (when (next pts)
+      (stroke-rgb (if selected? theme/gold theme/muted) (if selected? 2.2 1.3))
+      (q/no-fill)
+      (q/stroke-cap :round)
+      (let [path (curve/basis-path pts)
+            [behind tip] (curve/end-tangent path)]
+        (draw-ops (:start path) (:ops path) (:dashed? e))
+        (when (:head e)
+          (arrowhead (:head e) tip behind))))))
 
 (defn- draw-package [p selected?]
   (let [r (:rect p)
@@ -136,7 +164,7 @@
         (nil? sel)
         (do
           (rgb theme/muted)
-          (q/text "Click a class or package.\nDrag empty space to pan.\nR reloads the EDN file."
+          (q/text "Click a class or package.\nScroll vertically; Shift-scroll horizontally.\nArrow keys also pan.\nR reloads the EDN file."
                   (+ x 16) 48))
 
         (= :class (:kind sel))
@@ -171,6 +199,11 @@
   (apply q/background theme/bg)
   (q/push-matrix)
   (q/translate (- (:cam-x state)) (- (:cam-y state)))
+  (doseq [sec (:sections (:scene state))]
+    (rgb theme/gold)
+    (q/text-align :left :top)
+    (q/text-size 20)
+    (q/text (or (:title sec) "") m/pad (:title-y sec)))
   (doseq [p (:packages (:scene state))]
     (draw-package p (and (= :package (get-in state [:selected :kind]))
                          (= (:id p) (get-in state [:selected :id])))))
@@ -180,7 +213,7 @@
                    (get-in state [:hover :id]))]
     (doseq [e (:edges (:scene state))]
       (draw-edge e (or (= sel-id (:from e)) (= sel-id (:to e)))))
-    (doseq [c (:classes (:scene state))]
+    (doseq [c (remove :dummy? (:classes (:scene state)))]
       (draw-class c
                   (= sel-id (:id c))
                   (= hover-id (:id c)))))
