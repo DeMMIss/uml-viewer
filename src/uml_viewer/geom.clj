@@ -72,6 +72,17 @@
   [(+ x1 (* t (- x2 x1)))
    (+ y1 (* t (- y2 y1)))])
 
+(defn- clip-param
+  "Clip parametric interval [u1 u2] against one Liang-Barsky edge (p, q).
+   Nil if the interval is empty."
+  [[u1 u2] p q]
+  (if (< (abs p) 1.0e-12)
+    (when-not (neg? q) [u1 u2])
+    (let [t (/ q p)]
+      (if (neg? p)
+        (when-not (> t u2) [(max u1 t) u2])
+        (when-not (< t u1) [u1 (min u2 t)])))))
+
 (defn- overlap-param
   "Param interval [u1 u2] where segment a->b is inside r, or nil."
   [a b r]
@@ -83,26 +94,13 @@
         xmax (double (right r))
         ymin (double (:y r))
         ymax (double (bottom r))]
-    (loop [i 0 u1 0.0 u2 1.0]
-      (if (= i 4)
-        (when (<= u1 u2) [u1 u2])
-        (let [[p q] (case (int i)
-                      0 [(- dx) (- (double x1) xmin)]
-                      1 [dx (- xmax (double x1))]
-                      2 [(- dy) (- (double y1) ymin)]
-                      3 [dy (- ymax (double y1))])]
-          (if (< (abs p) 1.0e-12)
-            (if (neg? q)
-              nil
-              (recur (inc i) u1 u2))
-            (let [t (/ q p)]
-              (if (neg? p)
-                (if (> t u2)
-                  nil
-                  (recur (inc i) (max u1 t) u2))
-                (if (< t u1)
-                  nil
-                  (recur (inc i) u1 (min u2 t)))))))))))
+    (reduce (fn [uv [p q]]
+              (when uv (clip-param uv p q)))
+            [0.0 1.0]
+            [[(- dx) (- (double x1) xmin)]
+             [dx (- xmax (double x1))]
+             [(- dy) (- (double y1) ymin)]
+             [dy (- ymax (double y1))]])))
 
 (defn- merge-intervals [ivs]
   (reduce (fn [acc [a b]]

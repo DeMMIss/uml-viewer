@@ -9,7 +9,7 @@
                {:id :metrics :name "Metrics" :hide-members true}
                {:id :theme :name "Theme" :hide-members true}
                {:id :overlay :name "Overlay" :hide-members true}
-               {:id :source :name "Source" :hide-members true}
+               {:id :source :name "Source" :stereotype :interface :hide-members true}
                {:id :source.clojure :name "SourceClojure" :hide-members true}
                {:id :source-html :name "SourceHtml" :hide-members true}
                {:id :grok :name "Grok" :hide-members true}
@@ -75,7 +75,7 @@
                {:id :metrics :name "Metrics"}
                {:id :theme :name "Theme"}
                {:id :overlay :name "Overlay"}
-               {:id :source :name "Source"}
+               {:id :source :name "Source" :stereotype :interface}
                {:id :source.clojure :name "SourceClojure"}
                {:id :source-html :name "SourceHtml"}
                {:id :grok :name "Grok"}
@@ -151,7 +151,7 @@
                {:id :detail :name "Detail" :hide-members true}
                {:id :geom :name "Geom" :hide-members true}
                {:id :metrics :name "Metrics" :hide-members true}
-               {:id :source :name "Source" :hide-members true}
+               {:id :source :name "Source" :stereotype :interface :hide-members true}
                {:id :source.clojure :name "SourceClojure" :hide-members true}
                {:id :source-html :name "SourceHtml" :hide-members true}
                {:id :grok :name "Grok" :hide-members true}

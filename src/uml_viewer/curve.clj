@@ -7,6 +7,39 @@
    :c2 [(/ (+ x0 (* 2 x1)) 3.0) (/ (+ y0 (* 2 y1)) 3.0)]
    :p  [(/ (+ x0 (* 4 x1) x) 6.0) (/ (+ y0 (* 4 y1) y) 6.0)]})
 
+(defn- step
+  [{:keys [point x0 y0 x1 y1 ops] :as state} pt]
+  (let [x (double (first pt))
+        y (double (second pt))]
+    (case (int point)
+      0 (assoc state :point 1 :x0 x :y0 y :start pt)
+      1 (assoc state :point 2 :x1 x :y1 y)
+      2 (let [mx (/ (+ (* 5 x0) x1) 6.0)
+              my (/ (+ (* 5 y0) y1) 6.0)]
+          (assoc state
+            :point 3 :x0 x1 :y0 y1 :x1 x :y1 y
+            :ops (conj ops {:op :line :p [mx my]} (cubic x0 y0 x1 y1 x y))))
+      (assoc state
+        :x0 x1 :y0 y1 :x1 x :y1 y
+        :ops (conj ops (cubic x0 y0 x1 y1 x y))))))
+
+(defn- finish
+  "D3 curveBasis would add a degenerate cubic along the last chord
+   and a lineTo the last point. That forces the end tangent onto the
+   last polyline segment (orthogonal when the router used a face
+   port). Mermaid's marker is orient=auto on the spline, so keep the
+   last real cubic's handles and only pin its end to the last point."
+  [{:keys [point x1 y1 start ops]}]
+  (let [ops (cond
+              (>= point 3)
+              (if (seq ops)
+                (conj (pop ops) (assoc (last ops) :p [x1 y1]))
+                ops)
+              (= point 2)
+              (conj ops {:op :line :p [x1 y1]})
+              :else ops)]
+    {:start start :ops ops}))
+
 (defn basis-path
   "D3 curveBasis through `pts`. Returns {:start [x y] :ops [...]}."
   [pts]
@@ -15,41 +48,10 @@
     (cond
       (zero? n) {:start [0 0] :ops []}
       (= n 1) {:start (first pts) :ops []}
-      :else
-      (loop [i 0
-             point 0
-             x0 0.0 y0 0.0
-             x1 0.0 y1 0.0
-             start (first pts)
-             ops []]
-        (if (< i n)
-          (let [x (double (first (nth pts i)))
-                y (double (second (nth pts i)))]
-            (case (int point)
-              0 (recur (inc i) 1 x y x1 y1 (nth pts i) ops)
-              1 (recur (inc i) 2 x0 y0 x y start ops)
-              2 (let [mx (/ (+ (* 5 x0) x1) 6.0)
-                      my (/ (+ (* 5 y0) y1) 6.0)
-                      ops (conj ops {:op :line :p [mx my]} (cubic x0 y0 x1 y1 x y))]
-                  (recur (inc i) 3 x1 y1 x y start ops))
-              (let [ops (conj ops (cubic x0 y0 x1 y1 x y))]
-                (recur (inc i) point x1 y1 x y start ops))))
-          ;; D3 curveBasis would add a degenerate cubic along the last chord
-          ;; and a lineTo the last point. That forces the end tangent onto the
-          ;; last polyline segment (orthogonal when the router used a face
-          ;; port). Mermaid's marker is orient=auto on the spline, so keep the
-          ;; last real cubic's handles and only pin its end to the last point.
-          (let [ops (cond
-                      (>= point 3)
-                      (let [last-pt [(double (first (last pts)))
-                                     (double (second (last pts)))]]
-                        (if (seq ops)
-                          (conj (pop ops) (assoc (last ops) :p last-pt))
-                          ops))
-                      (= point 2)
-                      (conj ops {:op :line :p [x1 y1]})
-                      :else ops)]
-            {:start start :ops ops}))))))
+      :else (finish (reduce step
+                            {:point 0 :x0 0.0 :y0 0.0 :x1 0.0 :y1 0.0
+                             :start (first pts) :ops []}
+                            pts)))))
 
 (defn end-tangent
   "Point just behind the path end, along the last stroke (curve or line)."

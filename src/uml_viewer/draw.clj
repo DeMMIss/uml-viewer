@@ -114,6 +114,18 @@
     (draw-rule r crap y)
     (draw-text-line r line y)))
 
+(defn- corner-mark [c]
+  (case (some-> (:stereotype c) name)
+    "abstract" "α"
+    "interface" "I"
+    nil))
+
+(defn- draw-corner-mark [r ch]
+  (q/text-align :right :top)
+  (q/text-size 12)
+  (rgb [255 255 255])
+  (q/text ch (- (geom/right r) 6) (+ (:y r) 4)))
+
 (defn- draw-class [c selected? hovered?]
   (let [r (:rect c)
         crap (:crap c)]
@@ -126,7 +138,9 @@
     (q/rect (:x r) (:y r) (:w r) (:h r) 4)
     (reduce (fn [y line] (draw-class-line r crap line y))
             (+ (:y r) m/pad 4)
-            (:lines c))))
+            (:lines c))
+    (when-let [ch (corner-mark c)]
+      (draw-corner-mark r ch))))
 
 (defn- draw-sidebar [state]
   (let [w (q/width)

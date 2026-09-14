@@ -276,9 +276,28 @@
         (should-contain "μ 1.0" (texts log))
         (should-contain "«bean»" (texts log))
         (should-contain "go()" (texts log))
+        (should-not-contain "α" (texts log))
         (should (some #{:line} (kinds log)))
         (should-contain [:text-size 14] @log)
-        (should-contain [:text-size 12] @log)))))
+        (should-contain [:text-size 12] @log))))
+
+  (it "paints a white α in the upper-right of an abstract class"
+    (record-quil
+      (fn [log]
+        (call 'draw-class (assoc (a-class) :stereotype :abstract) false false)
+        (should-contain "α" (texts log))
+        (should (painted? log :fill [255 255 255]))
+        (should-contain [:text-align :right :top] @log)
+        (should-contain [:text "α" 104 24] @log))))
+
+  (it "paints a white I in the upper-right of an interface"
+    (record-quil
+      (fn [log]
+        (call 'draw-class (assoc (a-class) :stereotype :interface) false false)
+        (should-contain "I" (texts log))
+        (should-not-contain "α" (texts log))
+        (should (painted? log :fill [255 255 255]))
+        (should-contain [:text "I" 104 24] @log)))))
 
 (describe "draw-sidebar"
   (it "explains the empty inspector"
