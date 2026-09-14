@@ -13,7 +13,7 @@ clj -M:run
 clj -M:run examples/library.edn
 ```
 
-- Click a class or package to inspect it.
+- Click a class or package to inspect it. Click a class to open a detail window.
 - Scroll the mouse wheel to pan vertically; Shift-scroll (or left/right arrows) for horizontal.
 - `R` reloads the EDN file from disk (the watcher also reloads on save).
 - `Esc` clears the selection.
@@ -43,8 +43,10 @@ groups; edges by kind. A single diagram (top-level `:packages`) still works.
      :name "Book"
      :stereotype :class          ;; optional: :interface :enumeration :abstract
      :crap {:mu 1.1 :max 1.0 :sigma 0.0}
+     :coverage 0.92               ;; optional, 0–1
      :fields [{:name "isbn" :type "String"}]
-     :ops [{:name "find" :args ["isbn"] :returns "Book"}]}]}
+     :ops [{:name "find" :args ["isbn"] :returns "Book"
+            :coverage 0.88 :killed 6 :survived 1}]}]}]}
   {:id :app
    :label "Application"
    :classes
@@ -57,8 +59,13 @@ groups; edges by kind. A single diagram (top-level `:packages`) still works.
   {:from :loan :to :book :kind :association :label "borrows"}]}
 ```
 
-`:crap` may be a single number (`μ`) or `{:mu :max :sigma}`. Color bands:
-≤ 1.5 green, ≤ 2.5 gold, otherwise rust.
+`:crap` may be a single number (`μ`) or `{:mu :max :sigma}`. Package and class
+color uses `μ + σ`: green at 0, gold at 12, rust at 24 and above.
+
+`:coverage` is a ratio 0–1 on a class or op. Ops may also carry `:cc`
+(cyclomatic complexity), `:crap`, `:killed`, `:survived`, and `:private`.
+Click a class to open a detail window; private ops appear there (prefixed)
+but not on the diagram box.
 
 Edge `:kind` values:
 

@@ -1,5 +1,6 @@
 (ns uml-viewer.events-spec
   (:require [speclj.core :refer :all]
+            [uml-viewer.detail :as detail]
             [uml-viewer.events :as events]
             [uml-viewer.geom :as geom]
             [uml-viewer.ir :as ir]
@@ -28,12 +29,14 @@
           a (first (filter #(= :a (:id %)) (:classes (:scene s))))
           [x y] [(geom/cx (:rect a)) (geom/cy (:rect a))]
           next (events/on-press s x y)]
-      (should= {:kind :class :id :a} (:selected next))))
+      (should= {:kind :class :id :a} (:selected next))
+      (should= :a (:detail-id next))))
 
   (it "deselects when clicking empty space"
-    (let [s (assoc (state) :selected {:kind :class :id :a})
+    (let [s (assoc (state) :selected {:kind :class :id :a} :detail-id :a)
           next (events/on-press s 0 0)]
-      (should-not (:selected next))))
+      (should-not (:selected next))
+      (should= :a (:detail-id next))))
 
   (it "scrolls the camera vertically"
     (let [s (assoc (state) :scene {:size {:h 4000 :w 800}})
@@ -62,8 +65,10 @@
       (should= 0 (:cam-y (events/on-key (assoc s :cam-y 10) :up)))))
 
   (it "clears selection on escape and ignores other keys"
-    (let [s (assoc (state) :selected {:kind :class :id :a})]
-      (should-not (:selected (events/on-key s :esc)))
+    (let [s (assoc (state) :selected {:kind :class :id :a} :detail-id :a)
+          next (events/on-key s :esc)]
+      (should-not (:selected next))
+      (should= :a (:detail-id next))
       (should= s (events/on-key s :x))))
 
   (it "tracks hover under the pointer"
@@ -97,6 +102,26 @@
     (let [s (assoc (state) :scene {:size {:h 4000 :w 800}})]
       (should= 96 (:cam-y (events/on-scroll s {:count 2} 900)))
       (should= 0 (:cam-y (events/on-scroll s :nope 900))))))
+
+(describe "detail window"
+  (it "retargets the open class when a relationship is clicked"
+    (let [s (assoc (state) :detail-id :a)
+          model (detail/model (:scene s) :a)
+          rel (first (filter #(= :rel (:kind %)) (detail/rows model)))
+          next (events/on-detail-press s model 0 (:y rel))]
+      (should= :b (:detail-id next))
+      (should= {:kind :class :id :b} (:selected next))))
+
+  (it "drops a detail id whose class vanished on reload"
+    (let [f (java.io.File/createTempFile "uml" ".edn")]
+      (spit f "{:packages [{:id :p :label \"P\" :classes [{:id :a :name \"A\"} {:id :b :name \"B\"}]}] :edges []}")
+      (let [s (events/load-path (.getPath f))
+            gone (first (filter #(= "B" (:name %)) (:classes (:scene s))))
+            kept-name "A"]
+        (spit f "{:packages [{:id :p :label \"P\" :classes [{:id :a :name \"A\"}]}] :edges []}")
+        (let [next (events/maybe-reload (assoc s :mtime 0 :detail-id (:id gone)))]
+          (should-not (:detail-id next))
+          (should (some #(= kept-name (:name %)) (:classes (:scene next)))))))))
 
 (describe "document"
   (it "stacks layer diagrams top to bottom"

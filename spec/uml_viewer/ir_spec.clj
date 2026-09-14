@@ -36,6 +36,52 @@
       (should= 3 (count (:packages d)))
       (should (seq (:edges d)))))
 
+  (it "keeps class coverage and op coverage plus mutant counts"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :a :name "A"
+                            :coverage 0.87
+                            :cc 4
+                            :ops [{:name "go" :returns "void"
+                                   :coverage 0.5
+                                   :cc 3
+                                   :crap 2.1
+                                   :killed 4
+                                   :survived 1}]}]}]
+               :edges []})
+          op (get-in d [:packages 0 :classes 0 :ops 0])]
+      (should= 0.87 (get-in d [:packages 0 :classes 0 :coverage]))
+      (should= 4 (get-in d [:packages 0 :classes 0 :cc]))
+      (should= 0.5 (:coverage op))
+      (should= 3 (:cc op))
+      (should= 2.1 (get-in op [:crap :mu]))
+      (should= 4 (:killed op))
+      (should= 1 (:survived op))))
+
+  (it "keeps :private on an op"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :a :name "A"
+                            :ops [{:name "hide" :private true}
+                                  {:name "show"}]}]}]
+               :edges []})
+          ops (get-in d [:packages 0 :classes 0 :ops])]
+      (should (:private (first ops)))
+      (should-not (:private (second ops)))))
+
+  (it "rejects coverage outside 0–1 and non-integer mutant counts"
+    (should-throw
+      (ir/normalize {:packages [{:id :p :label "P"
+                                 :classes [{:id :a :name "A" :coverage 1.2}]}]
+                     :edges []}))
+    (should-throw
+      (ir/normalize {:packages [{:id :p :label "P"
+                                 :classes [{:id :a :name "A"
+                                            :ops [{:name "go" :killed -1}]}]}]
+                     :edges []})))
+
   (it "builds member text from name, args, type, and returns"
     (let [d (ir/normalize
               {:packages

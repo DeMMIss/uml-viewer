@@ -3,6 +3,7 @@
             [quil.core :as q]
             [uml-viewer.geom :as geom]
             [uml-viewer.curve :as curve]
+            [uml-viewer.detail :as detail]
             [uml-viewer.hit :as hit]
             [uml-viewer.metrics :as m]
             [uml-viewer.theme :as theme]))
@@ -205,3 +206,61 @@
     (q/text-align :left :top)
     (q/text-size 12)
     (q/text title 12 8)))
+
+(defn- detail-row-color [row]
+  (case (:kind row)
+    :name theme/ink
+    :crap theme/gold
+    :heading theme/gold
+    :field theme/ink
+    :rel theme/ink
+    :stats theme/ink
+    theme/muted))
+
+(defn- cell-color [row col]
+  (case (:id col)
+    :cov (theme/coverage-ink (:coverage row))
+    :crap (theme/stroke-for {:mu (:crap-n row)})
+    :survived (if (pos? (or (:survived row) 0))
+                [224 122 74]
+                theme/muted)
+    :killed theme/muted
+    :cc theme/muted
+    theme/muted))
+
+(defn- draw-detail-cells [row y]
+  (doseq [col (detail/column-layout)]
+    (let [s (if (= :col-header (:kind row))
+              (:label col)
+              (get row (:key col)))]
+      (when s
+        (q/text-align :right :top)
+        (q/text-size 13)
+        (rgb (if (= :col-header (:kind row))
+               theme/gold
+               (cell-color row col)))
+        (q/text s (:right col) y)))))
+
+(defn- draw-detail-row [row]
+  (let [x detail/pad
+        y (:y row)
+        cols (detail/column-layout)
+        name-right (if (seq cols)
+                     (- (:left (first cols)) detail/col-gap)
+                     (- detail/width detail/pad))]
+    (when (and (:text row) (not= :col-header (:kind row)))
+      (q/text-align :left :top)
+      (q/text-size (if (= :name (:kind row)) 20 13))
+      (rgb (if (:private row) theme/muted (detail-row-color row)))
+      (q/text (or (:text row) "") x y
+              (max 0 (- name-right x)) (:h row)))
+    (when (#{:col-header :stats} (:kind row))
+      (draw-detail-cells row y))))
+
+(defn draw-detail [model scroll]
+  (apply q/background theme/bg)
+  (q/push-matrix)
+  (q/translate 0 (- scroll))
+  (doseq [row (detail/rows model)]
+    (draw-detail-row row))
+  (q/pop-matrix))

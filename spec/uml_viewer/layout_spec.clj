@@ -34,6 +34,19 @@
              {:from :hub :to :e :kind :association}]}))
 
 (describe "layout"
+  (it "omits private ops from the class box"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :a :name "A"
+                            :ops [{:name "show"}
+                                  {:name "hide" :private true}]}]}]
+               :edges []})
+          lines (layout/class-lines (get-in d [:packages 0 :classes 0]))
+          texts (keep :text lines)]
+      (should (some #{"show"} texts))
+      (should-not (some #{"hide"} texts))))
+
   (it "lays an LR hub to the left of its targets"
     (let [scene (layout/layout hub)
           h (first (filter #(= :hub (:id %)) (:classes scene)))

@@ -8,8 +8,10 @@
 
 (defn class-lines [c]
   (let [crap (m/format-crap (:crap c))
-        fields (mapv :text (or (:fields c) []))
-        ops (mapv :text (or (:ops c) []))]
+        fields (when-not (:hide-members c)
+                 (mapv :text (or (:fields c) [])))
+        ops (when-not (:hide-members c)
+              (mapv :text (remove :private (or (:ops c) []))))]
     (cond-> []
       (stereotype-line c) (conj {:kind :stereo :text (stereotype-line c)})
       true (conj {:kind :name :text (:name c)})

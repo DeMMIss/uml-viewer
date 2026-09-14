@@ -1,5 +1,6 @@
 (ns uml-viewer.events
   (:require [uml-viewer.compose :as compose]
+            [uml-viewer.detail :as detail]
             [uml-viewer.hit :as hit]
             [uml-viewer.ir :as ir]
             [uml-viewer.layout :as layout]
@@ -19,21 +20,42 @@
      :scene (compile-document (ir/load-document path))
      :selected nil
      :hover nil
+     :detail-id nil
      :cam-x 0
      :cam-y 0}))
+
+(defn- drop-missing-detail [state]
+  (let [id (:detail-id state)]
+    (cond-> state
+      (and id (nil? (hit/class-by-id (:scene state) id)))
+      (dissoc :detail-id))))
 
 (defn maybe-reload [state]
   (let [file (java.io.File. (:path state))
         mtime (.lastModified file)]
     (if (and (.exists file) (not= mtime (:mtime state)))
       (try
-        (assoc state
-          :mtime mtime
-          :scene (compile-document (ir/load-document (:path state)))
-          :error nil)
+        (-> state
+            (assoc :mtime mtime
+                   :scene (compile-document (ir/load-document (:path state)))
+                   :error nil)
+            drop-missing-detail)
         (catch Exception e
           (assoc state :mtime mtime :error (.getMessage e))))
       state)))
+
+(defn select-class [state id]
+  (if (hit/class-by-id (:scene state) id)
+    (assoc state :selected {:kind :class :id id} :detail-id id)
+    state))
+
+(defn close-detail [state]
+  (dissoc state :detail-id))
+
+(defn on-detail-press [state model scroll y]
+  (if-let [id (detail/rel-at (detail/rows model) (+ y scroll))]
+    (select-class state id)
+    state))
 
 (defn world-xy [state x y]
   [(+ x (:cam-x state)) (+ y (:cam-y state))])
@@ -45,7 +67,9 @@
 (defn on-press [state x y]
   (let [[wx wy] (world-xy state x y)
         hit (hit/at (:scene state) wx wy)]
-    (assoc state :selected hit)))
+    (if (= :class (:kind hit))
+      (select-class state (:id hit))
+      (assoc state :selected hit))))
 
 (defn on-scroll [state amount opts]
   (let [opts (if (map? opts) opts {:window-h opts :window-w 1500})
