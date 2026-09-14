@@ -1,6 +1,7 @@
 (ns uml-viewer.detail
   (:require [uml-viewer.hit :as hit]
-            [uml-viewer.metrics :as m]))
+            [uml-viewer.metrics :as m]
+            [uml-viewer.overlay :as overlay]))
 
 (def width 640)
 (def height 700)
@@ -14,27 +15,24 @@
    {:id :killed :label "killed" :key :killed-s :w 52}
    {:id :survived :label "survived" :key :survived-s :w 68}])
 
+(def ^:private rel-phrases
+  {:inheritance ["extends" "extended by"]
+   :implements ["implements" "implemented by"]
+   :association ["associates with" "associated from"]
+   :dependency ["depends on" "used by"]
+   :aggregation ["aggregates" "aggregated by"]
+   :composition ["composes" "composed in"]})
+
 (defn- rel-phrase [kind outgoing?]
-  (case [kind outgoing?]
-    [:inheritance true] "extends"
-    [:inheritance false] "extended by"
-    [:implements true] "implements"
-    [:implements false] "implemented by"
-    [:association true] "associates with"
-    [:association false] "associated from"
-    [:dependency true] "depends on"
-    [:dependency false] "used by"
-    [:aggregation true] "aggregates"
-    [:aggregation false] "aggregated by"
-    [:composition true] "composes"
-    [:composition false] "composed in"
-    (if outgoing? "to" "from")))
+  (let [[out in] (get rel-phrases kind ["to" "from"])]
+    (if outgoing? out in)))
 
 (defn model
   "Class card for the detail window, or nil if `id` is unknown."
   [scene id]
   (when-let [c (hit/class-by-id scene id)]
     {:class c
+     :ns (overlay/class-namespace c)
      :package (hit/package-by-id scene (:package c))
      :title (get-in scene [:diagram :title])
      :rels (mapv (fn [e]
@@ -120,12 +118,11 @@
         acc (emit acc :col-header "" {})
         acc (emit acc :stats (:name c) (format-cells (class-metrics c)))]
     (reduce (fn [acc op]
-              (let [label (if (:private op)
-                            (str "– " (:text op))
-                            (:text op))]
+              (let [label (str (if (:private op) "- " "+ ") (:text op))]
                 (emit acc :stats label
                       (assoc (format-cells (op-metrics op))
-                        :private (boolean (:private op))))))
+                        :private (boolean (:private op))
+                        :op-name (:name op)))))
             acc
             (:ops c))))
 
@@ -186,4 +183,13 @@
           (when (and (= :rel (:kind row))
                      (<= (:y row) y (+ (:y row) (:h row) -1)))
             (:id row)))
+        rows))
+
+(defn member-at
+  "Op name of the member row under content-y, or nil."
+  [rows y]
+  (some (fn [row]
+          (when (and (:op-name row)
+                     (<= (:y row) y (+ (:y row) (:h row) -1)))
+            (:op-name row)))
         rows))

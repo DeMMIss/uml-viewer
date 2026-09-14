@@ -7,7 +7,13 @@
      :classes [{:id :ir :name "Ir" :hide-members true}
                {:id :geom :name "Geom" :hide-members true}
                {:id :metrics :name "Metrics" :hide-members true}
-               {:id :theme :name "Theme" :hide-members true}]}
+               {:id :theme :name "Theme" :hide-members true}
+               {:id :overlay :name "Overlay" :hide-members true}
+               {:id :source :name "Source" :hide-members true}
+               {:id :source.clojure :name "SourceClojure" :hide-members true}
+               {:id :source-html :name "SourceHtml" :hide-members true}
+               {:id :grok :name "Grok" :hide-members true}
+               {:id :grok-status :name "GrokStatus" :hide-members true}]}
     {:id :engine
      :label "Engine"
      :classes [{:id :layout :name "Layout" :hide-members true}
@@ -23,12 +29,15 @@
      :label "Adapters"
      :classes [{:id :draw :name "Draw" :hide-members true}
                {:id :sketch :name "Sketch" :hide-members true}
-               {:id :core :name "Core" :hide-members true}]}]
+               {:id :core :name "Core" :hide-members true}
+               {:id :source-window :name "SourceWindow" :hide-members true}
+               {:id :grok-window :name "GrokWindow" :hide-members true}]}]
    :edges
    [{:from :layout :to :geom :kind :dependency}
     {:from :layout :to :metrics :kind :dependency}
     {:from :route :to :geom :kind :dependency}
     {:from :route :to :metrics :kind :dependency}
+    {:from :curve :to :geom :kind :dependency}
     {:from :compose :to :layout :kind :dependency}
     {:from :compose :to :route :kind :dependency}
     {:from :hit :to :geom :kind :dependency}
@@ -36,6 +45,8 @@
     {:from :events :to :compose :kind :dependency}
     {:from :events :to :hit :kind :dependency}
     {:from :events :to :detail :kind :dependency}
+    {:from :events :to :overlay :kind :dependency}
+    {:from :detail :to :overlay :kind :dependency}
     {:from :draw :to :curve :kind :dependency}
     {:from :draw :to :theme :kind :dependency}
     {:from :draw :to :hit :kind :dependency}
@@ -43,7 +54,16 @@
     {:from :sketch :to :draw :kind :dependency}
     {:from :sketch :to :events :kind :dependency}
     {:from :sketch :to :detail :kind :dependency}
-    {:from :core :to :sketch :kind :dependency}]}
+    {:from :sketch :to :source-window :kind :dependency}
+    {:from :sketch :to :grok :kind :dependency}
+    {:from :core :to :sketch :kind :dependency}
+    {:from :core :to :grok :kind :dependency}
+    {:from :source-window :to :source :kind :dependency}
+    {:from :source-window :to :source.clojure :kind :dependency}
+    {:from :source-window :to :source-html :kind :dependency}
+    {:from :source.clojure :to :source :kind :implements}
+    {:from :grok-window :to :grok :kind :dependency}
+    {:from :grok-window :to :grok-status :kind :dependency}]}
 
   {:title "Domain"
    :direction :lr
@@ -53,8 +73,15 @@
      :classes [{:id :ir :name "Ir"}
                {:id :geom :name "Geom"}
                {:id :metrics :name "Metrics"}
-               {:id :theme :name "Theme"}]}]
-   :edges []}
+               {:id :theme :name "Theme"}
+               {:id :overlay :name "Overlay"}
+               {:id :source :name "Source"}
+               {:id :source.clojure :name "SourceClojure"}
+               {:id :source-html :name "SourceHtml"}
+               {:id :grok :name "Grok"}
+               {:id :grok-status :name "GrokStatus"}]}]
+   :edges
+   [{:from :source.clojure :to :source :kind :implements}]}
 
   {:title "Engine"
    :direction :lr
@@ -67,16 +94,17 @@
                {:id :compose :name "Compose"}
                {:id :hit :name "Hit"}
                {:id :geom :name "Geom" :hide-members true}
-               {:id :metrics :name "Metrics" :hide-members true}
-               {:id :ir :name "Ir" :hide-members true}]}]
+               {:id :metrics :name "Metrics" :hide-members true}]}]
    :edges
    [{:from :layout :to :geom :kind :dependency}
     {:from :layout :to :metrics :kind :dependency}
     {:from :route :to :geom :kind :dependency}
     {:from :route :to :metrics :kind :dependency}
+    {:from :curve :to :geom :kind :dependency}
     {:from :compose :to :layout :kind :association}
     {:from :compose :to :route :kind :association}
     {:from :compose :to :geom :kind :dependency}
+    {:from :compose :to :metrics :kind :dependency}
     {:from :hit :to :geom :kind :dependency}]}
 
   {:title "Application"
@@ -91,7 +119,8 @@
                {:id :hit :name "Hit" :hide-members true}
                {:id :layout :name "Layout" :hide-members true}
                {:id :route :name "Route" :hide-members true}
-               {:id :metrics :name "Metrics" :hide-members true}]}]
+               {:id :metrics :name "Metrics" :hide-members true}
+               {:id :overlay :name "Overlay" :hide-members true}]}]
    :edges
    [{:from :events :to :compose :kind :association}
     {:from :events :to :ir :kind :dependency}
@@ -99,8 +128,11 @@
     {:from :events :to :layout :kind :dependency}
     {:from :events :to :route :kind :dependency}
     {:from :events :to :detail :kind :dependency}
+    {:from :events :to :overlay :kind :dependency}
+    {:from :events :to :metrics :kind :dependency}
     {:from :detail :to :hit :kind :dependency}
-    {:from :detail :to :metrics :kind :dependency}]}
+    {:from :detail :to :metrics :kind :dependency}
+    {:from :detail :to :overlay :kind :dependency}]}
 
   {:title "Adapters"
    :direction :lr
@@ -110,17 +142,38 @@
      :classes [{:id :draw :name "Draw"}
                {:id :sketch :name "Sketch"}
                {:id :core :name "Core"}
+               {:id :source-window :name "SourceWindow"}
+               {:id :grok-window :name "GrokWindow"}
                {:id :events :name "Events" :hide-members true}
                {:id :curve :name "Curve" :hide-members true}
                {:id :theme :name "Theme" :hide-members true}
                {:id :hit :name "Hit" :hide-members true}
-               {:id :detail :name "Detail" :hide-members true}]}]
+               {:id :detail :name "Detail" :hide-members true}
+               {:id :geom :name "Geom" :hide-members true}
+               {:id :metrics :name "Metrics" :hide-members true}
+               {:id :source :name "Source" :hide-members true}
+               {:id :source.clojure :name "SourceClojure" :hide-members true}
+               {:id :source-html :name "SourceHtml" :hide-members true}
+               {:id :grok :name "Grok" :hide-members true}
+               {:id :grok-status :name "GrokStatus" :hide-members true}]}]
    :edges
    [{:from :core :to :sketch :kind :association}
+    {:from :core :to :events :kind :dependency}
+    {:from :core :to :grok :kind :dependency}
     {:from :sketch :to :draw :kind :dependency}
     {:from :sketch :to :events :kind :dependency}
     {:from :sketch :to :detail :kind :dependency}
+    {:from :sketch :to :source-window :kind :dependency}
+    {:from :sketch :to :grok :kind :dependency}
     {:from :draw :to :curve :kind :dependency}
     {:from :draw :to :theme :kind :dependency}
     {:from :draw :to :hit :kind :dependency}
-    {:from :draw :to :detail :kind :dependency}]}]}
+    {:from :draw :to :detail :kind :dependency}
+    {:from :draw :to :geom :kind :dependency}
+    {:from :draw :to :metrics :kind :dependency}
+    {:from :source-window :to :source :kind :dependency}
+    {:from :source-window :to :source.clojure :kind :dependency}
+    {:from :source-window :to :source-html :kind :dependency}
+    {:from :source.clojure :to :source :kind :implements}
+    {:from :grok-window :to :grok :kind :dependency}
+    {:from :grok-window :to :grok-status :kind :dependency}]}]}

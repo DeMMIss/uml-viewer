@@ -20,18 +20,32 @@ clj -M:run examples/library.edn
 clj -M:run examples/uml-viewer.edn
 ```
 
+A **tmux** session `uml-viewer-grok` starts interactive Grok (`--yolo --trust`)
+and a Terminal window attaches to it. Type there; Esc is the real TUI
+interrupt. Closing the diagram kills that tmux session (and the Terminal
+attach). After Grok changes the EDN the viewer reloads. Ask it to recompute
+CRAP or mutation when you want fresh `.metrics/` snapshots. Standing rules
+live in `.grok/rules/uml-viewer.md`.
+
+A missing or unreadable file prints `UML viewer: file not found: …` and opens
+an empty window with the error in the inspector, instead of throwing.
+
 - Click a class to open (or retarget) a **class card**. That click brings the
   card in front. Click empty space on the diagram to bring the diagram in front.
   The two windows are otherwise independent.
+- Hover a member on the class card to highlight it. Click it to open an
+  independent source window (syntax-colored HTML, same style as arch-view).
+  See [Source extractors](#source-extractors).
 - Click a package to inspect it in the sidebar.
-- Private functions (`defn-`) appear on the card (prefixed with –), not on the
-  class box. `:hide-members true` hides fields and ops on the box (used on the
-  Layers overview).
+- Methods on the class card are marked `+` public and `-` private. Private
+  functions (`defn-`) are not drawn on the class box. `:hide-members true`
+  hides fields and ops on the box (used on the Layers overview).
 - Scroll the mouse wheel to pan vertically; Shift-scroll (or left/right arrows)
   for horizontal.
 - `R` reloads the EDN (the watcher also reloads on save). Overlay re-reads
   `.metrics/` on the next load.
 - `Esc` on the diagram clears the selection. `Esc` on the card closes it.
+  Closing the main window exits the app.
 
 ```bash
 clj -M:spec
@@ -117,5 +131,36 @@ Layout follows Mermaid's three stages:
    only when a sibling sits in the way), then stroke with D3 `curveBasis`
    cubics. All arrows are solid grey.
 
-The engine (`ir`, `layout`, `route`, `hit`, `events`, `overlay`) does not
-depend on Quil. Only `draw` and `sketch` talk to Processing.
+## Source extractors
+
+Clicking a member asks `uml-viewer.source` for the **whole file** and a
+**start line**. The IR (and the class card) only supply an **identity
+map**; a language-specific extractor turns that into
+`{:title :file :body :line}`. The source window opens on that file and
+scrolls to the member (highlighted).
+
+```clojure
+(source/member-source {:lang :clojure
+                       :ns "uml-viewer.layout"
+                       :name "layout"})
+```
+
+`:lang` selects the extractor (default `:clojure`). Register another
+implementation with `(source/register! :java my-java-extractor)`. The
+extractor must satisfy `LanguageSource`:
+
+| method | role |
+|--------|------|
+| `locate` | path to the file that should contain the member |
+| `extract` | slice that member out of the file text |
+| `title` | window title |
+
+**Clojure** (`uml-viewer.source.clojure`) is the only implementation today:
+it maps `:ns` to `src/...clj` and finds the top-level `(defn name …)` /
+`(defn- name …)` so the window can jump to that line. That locate/line
+step is not enough for Java or C — those need a parser or language
+server, and a richer identity (`:class`, `:signature`, `:file`). The
+protocol is the seam; do not special-case languages in the class card.
+
+The engine (`ir`, `layout`, `route`, `hit`, `events`, `overlay`, `source`)
+does not depend on Quil. Only `draw` and `sketch` talk to Processing.

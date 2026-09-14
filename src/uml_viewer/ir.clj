@@ -55,7 +55,8 @@
                (contains? x :survived) (assoc :survived (as-count (:survived x)))
                (contains? x :cc) (assoc :cc (as-cc (:cc x)))
                (contains? x :crap) (assoc :crap (as-crap (:crap x)))
-               (true? (:private x)) (assoc :private true))
+               (true? (:private x)) (assoc :private true)
+               (contains? x :name) (assoc :name (:name x)))
     :else (throw (ex-info "member must be a string or map" {:value x}))))
 
 (defn- as-class [c]

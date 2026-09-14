@@ -5,6 +5,9 @@
             [uml-viewer.ir :as ir]
             [uml-viewer.metrics :as m]))
 
+(defn- call [sym & args]
+  (apply (ns-resolve 'uml-viewer.detail sym) args))
+
 (defn scene []
   (events/compile-diagram
     (ir/normalize
@@ -24,6 +27,22 @@
                    {:id :b :name "B"}]}]
        :edges [{:from :a :to :b :kind :dependency}]})))
 
+(describe "rel-phrase"
+  (it "names each edge kind in both directions"
+    (doseq [[kind out in]
+            [[:inheritance "extends" "extended by"]
+             [:implements "implements" "implemented by"]
+             [:association "associates with" "associated from"]
+             [:dependency "depends on" "used by"]
+             [:aggregation "aggregates" "aggregated by"]
+             [:composition "composes" "composed in"]]]
+      (should= out (call 'rel-phrase kind true))
+      (should= in (call 'rel-phrase kind false))))
+
+  (it "falls back to to/from for an unknown kind"
+    (should= "to" (call 'rel-phrase :other true))
+    (should= "from" (call 'rel-phrase :other false))))
+
 (describe "detail"
   (it "formats coverage and mutant counts"
     (should= "90%" (m/format-coverage 0.9))
@@ -36,8 +55,8 @@
           model (detail/model s :a)
           rows (detail/rows model)
           kinds (map :kind rows)
-          go (first (filter #(= "go(x) : void" (:text %)) rows))
-          hide (first (filter #(= "– hide" (:text %)) rows))
+          go (first (filter #(= "+ go(x) : void" (:text %)) rows))
+          hide (first (filter #(= "- hide" (:text %)) rows))
           cls (first (filter #(and (= :stats (:kind %)) (= "A" (:text %))) rows))
           rel (first (filter #(= :rel (:kind %)) rows))]
       (should= "A" (get-in model [:class :name]))
@@ -57,7 +76,11 @@
       (should= "3" (:killed-s cls))
       (should= "1" (:survived-s cls))
       (should= :b (:id rel))
-      (should= :b (detail/rel-at rows (+ (:y rel) 1)))))
+      (should= :b (detail/rel-at rows (+ (:y rel) 1)))
+      (should= "go" (:op-name go))
+      (should= "go" (detail/member-at rows (+ (:y go) 1)))
+      (should-be-nil (detail/member-at rows (:y cls)))
+      (should= "hide" (detail/member-at rows (+ (:y hide) 1)))))
 
   (it "shows class CRAP as μ, omits CC, and keeps μ/max/σ on the header line"
     (let [s (events/compile-diagram

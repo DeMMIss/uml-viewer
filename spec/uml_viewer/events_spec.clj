@@ -82,6 +82,18 @@
       (should (seq (:classes (:scene s))))
       (should (pos? (:mtime s)))))
 
+  (it "does not throw on a missing file"
+    (let [s (events/load-path "no-such-diagram.edn")]
+      (should (re-find #"not found" (:error s)))
+      (should= [] (get-in s [:scene :classes]))))
+
+  (it "does not throw on invalid EDN"
+    (let [f (java.io.File/createTempFile "bad" ".edn")]
+      (spit f "{:packages")
+      (let [s (events/load-path (.getPath f))]
+        (should (string? (:error s)))
+        (should= [] (get-in s [:scene :classes])))))
+
   (it "reloads when the file mtime changes"
     (let [s (assoc (events/load-path "examples/library.edn") :mtime 0)
           next (events/maybe-reload s)]

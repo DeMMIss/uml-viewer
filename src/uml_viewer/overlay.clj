@@ -61,7 +61,9 @@
                                :survived (:survived form))]))
               (:forms snapshot))))
 
-(defn- ns-for-class [c]
+(defn class-namespace
+  "Project namespace for a class: `:ns`, or `uml-viewer.<id>`."
+  [c]
   (or (:ns c)
       (let [id (name (:id c))
             id (if-let [m (re-find #"^d\d+-(.+)$" id)] (second m) id)]
@@ -104,7 +106,7 @@
           names)))
 
 (defn overlay-class [c crap-by-ns mutate-by-ns]
-  (let [ns-name (ns-for-class c)
+  (let [ns-name (class-namespace c)
         crap-fns (or (get crap-by-ns ns-name) [])
         mut-fns (mutate-by-fn (get mutate-by-ns ns-name))
         scores (keep :crap crap-fns)

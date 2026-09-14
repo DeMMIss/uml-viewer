@@ -90,6 +90,30 @@
     (q/text-size 14)
     (q/text (:title p) (+ (:x r) m/pad) (+ (:y r) (/ m/banner-h 2)))))
 
+(defn- class-line-ink [kind]
+  (case kind
+    :crap theme/gold
+    :stereo theme/muted
+    theme/ink))
+
+(defn- draw-rule [r crap y]
+  (stroke-rgb (theme/stroke-for crap) 1)
+  (q/line (+ (:x r) 6) (+ y 4)
+          (- (geom/right r) 6) (+ y 4))
+  (+ y m/pad))
+
+(defn- draw-text-line [r line y]
+  (q/text-align :center :top)
+  (q/text-size (if (= :name (:kind line)) 14 12))
+  (rgb (class-line-ink (:kind line)))
+  (q/text (:text line) (geom/cx r) y)
+  (+ y m/line-h))
+
+(defn- draw-class-line [r crap line y]
+  (if (= :rule (:kind line))
+    (draw-rule r crap y)
+    (draw-text-line r line y)))
+
 (defn- draw-class [c selected? hovered?]
   (let [r (:rect c)
         crap (:crap c)]
@@ -100,26 +124,9 @@
                   :else (theme/stroke-for crap))
                 (if selected? 2.6 1.3))
     (q/rect (:x r) (:y r) (:w r) (:h r) 4)
-    (loop [lines (:lines c)
-           y (+ (:y r) m/pad 4)]
-      (when (seq lines)
-        (let [line (first lines)]
-          (if (= :rule (:kind line))
-            (do
-              (stroke-rgb (theme/stroke-for crap) 1)
-              (q/line (+ (:x r) 6) (+ y 4)
-                      (- (geom/right r) 6) (+ y 4))
-              (recur (rest lines) (+ y 8)))
-            (do
-              (q/text-align :center :top)
-              (q/text-size (if (= :name (:kind line)) 14 12))
-              (rgb (case (:kind line)
-                     :name theme/ink
-                     :crap theme/gold
-                     :stereo theme/muted
-                     theme/ink))
-              (q/text (:text line) (geom/cx r) y)
-              (recur (rest lines) (+ y m/line-h)))))))))
+    (reduce (fn [y line] (draw-class-line r crap line y))
+            (+ (:y r) m/pad 4)
+            (:lines c))))
 
 (defn- draw-sidebar [state]
   (let [w (q/width)
@@ -241,26 +248,35 @@
                (cell-color row col)))
         (q/text s (:right col) y)))))
 
-(defn- draw-detail-row [row]
+(defn- draw-detail-row [row hover?]
   (let [x detail/pad
         y (:y row)
         cols (detail/column-layout)
         name-right (if (seq cols)
                      (- (:left (first cols)) detail/col-gap)
                      (- detail/width detail/pad))]
+    (when hover?
+      (q/no-stroke)
+      (q/fill 232 196 72 48)
+      (q/rect 0 y detail/width (:h row)))
     (when (and (:text row) (not= :col-header (:kind row)))
       (q/text-align :left :top)
       (q/text-size (if (= :name (:kind row)) 20 13))
-      (rgb (if (:private row) theme/muted (detail-row-color row)))
+      (rgb (cond
+             hover? theme/gold
+             (:private row) theme/muted
+             :else (detail-row-color row)))
       (q/text (or (:text row) "") x y
               (max 0 (- name-right x)) (:h row)))
     (when (#{:col-header :stats} (:kind row))
       (draw-detail-cells row y))))
 
-(defn draw-detail [model scroll]
-  (apply q/background theme/bg)
-  (q/push-matrix)
-  (q/translate 0 (- scroll))
-  (doseq [row (detail/rows model)]
-    (draw-detail-row row))
-  (q/pop-matrix))
+(defn draw-detail
+  ([model scroll] (draw-detail model scroll nil))
+  ([model scroll hover]
+   (apply q/background theme/bg)
+   (q/push-matrix)
+   (q/translate 0 (- scroll))
+   (doseq [row (detail/rows model)]
+     (draw-detail-row row (and hover (= hover (:op-name row)))))
+   (q/pop-matrix)))

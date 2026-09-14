@@ -55,4 +55,11 @@
 
   (it "confines Processing to draw and sketch"
     (let [owners (set (map (comp str :ns) (violations (constantly true) quil-lib?)))]
-      (should= #{"uml-viewer.draw" "uml-viewer.sketch"} owners))))
+      (should= #{"uml-viewer.draw" "uml-viewer.sketch"} owners)))
+
+  (it "keeps source lookup and grok spawn free of Swing and Quil"
+    (should= [] (violations #(contains? #{"uml-viewer.source"
+                                         "uml-viewer.source.clojure"
+                                         "uml-viewer.grok"} (str %))
+                            #(or (quil-lib? %)
+                                 (#{'javax.swing 'java.awt} %))))))
