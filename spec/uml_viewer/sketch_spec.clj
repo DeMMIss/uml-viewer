@@ -353,22 +353,28 @@
 (describe "sketch main window"
   (before (reset! sketch/!bridge (empty-bridge)))
 
-  (it "opens the detail card for a class click and unpins it otherwise"
+  (it "opens the detail card on double-click of a class and unpins otherwise"
     (let [s (state)
           [x y] (class-xy s :a)
           ensured (atom nil)
           pinned (atom [])]
       (with-redefs [uml-viewer.sketch/ensure-detail-window! (fn [m] (reset! ensured m))
                     uml-viewer.sketch/pin-card! (fn [on?] (swap! pinned conj on?))]
-        (let [next (call 'on-main-press s {:x x :y y})]
+        (let [single (call 'on-main-press s {:x x :y y :count 1})]
+          (should= {:kind :class :id :a} (:selected single))
+          (should-be-nil (:detail-id single))
+          (should-be-nil @ensured)
+          (should= [] @pinned))
+        (let [next (call 'on-main-press s {:x x :y y :count 2})]
           (should= {:kind :class :id :a} (:selected next))
+          (should= :a (:detail-id next))
           (should= :a (get-in @ensured [:class :id]))
           (should= [true] @pinned))
         (reset! ensured nil)
         (with-redefs [detail/model (fn [_ _] nil)
                       uml-viewer.sketch/ensure-detail-window! (fn [m] (reset! ensured m))
                       uml-viewer.sketch/pin-card! (fn [on?] (swap! pinned conj on?))]
-          (call 'on-main-press s {:x x :y y})
+          (call 'on-main-press s {:x x :y y :count 2})
           (should-be-nil @ensured)
           (should= [true true] @pinned))
         (call 'on-main-press s {:x 0 :y 0})

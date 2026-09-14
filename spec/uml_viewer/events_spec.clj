@@ -30,7 +30,7 @@
           [x y] [(geom/cx (:rect a)) (geom/cy (:rect a))]
           next (events/on-press s x y)]
       (should= {:kind :class :id :a} (:selected next))
-      (should= :a (:detail-id next))))
+      (should-be-nil (:detail-id next))))
 
   (it "deselects when clicking empty space"
     (let [s (assoc (state) :selected {:kind :class :id :a} :detail-id :a)

@@ -33,9 +33,9 @@ then `clj -M:ir` after every change. The viewer reloads the generated EDN
 A missing or unreadable file prints `UML viewer: file not found: …` and opens
 an empty window with the error in the inspector, instead of throwing.
 
-- Click a class to open (or retarget) a **class card**. That click brings the
-  card in front. Click empty space on the diagram to bring the diagram in front.
-  The two windows are otherwise independent.
+- Double-click a class to open (or retarget) a **class card**. That click
+  brings the card in front. Click empty space on the diagram to bring the
+  diagram in front. The two windows are otherwise independent.
 - Hover a member on the class card to highlight it. Double-click it to open
   an independent source window (syntax-colored HTML, same style as arch-view).
   See [Source extractors](#source-extractors).

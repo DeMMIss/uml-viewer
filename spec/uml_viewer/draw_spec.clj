@@ -305,7 +305,8 @@
       (fn [log]
         (call 'draw-sidebar {:selected nil :scene (scene)})
         (should-contain "Inspector" (texts log))
-        (should (some #(re-find #"Click a class" %) (texts log))))))
+        (should (some #(re-find #"Click a class" %) (texts log)))
+        (should (some #(re-find #"Double-click a class" %) (texts log))))))
 
   (it "shows class name, package, CRAP, and members"
     (record-quil

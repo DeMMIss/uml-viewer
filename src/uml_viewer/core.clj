@@ -14,4 +14,4 @@
     (sketch/start! path source-impl)
     (grok/open-in-terminal!)
     (println "Watching" path)
-    (println "Click a class. Scroll to pan (Shift-scroll for horizontal). R reloads.")))
+    (println "Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). R reloads.")))

@@ -201,13 +201,19 @@
 (defn- on-main-press [state event]
   (let [state (events/on-press state (:x event) (:y event))
         class? (= :class (:kind (:selected state)))]
-    (if class?
-      (do
+    (cond
+      (and class? (>= (click-count event) 2))
+      (let [state (events/select-class state (get-in state [:selected :id]))]
         (when-let [model (detail/model (:scene state) (:detail-id state))]
           (ensure-detail-window! model))
-        (pin-card! true))
-      (pin-card! false))
-    state))
+        (pin-card! true)
+        state)
+
+      class?
+      state
+
+      :else
+      (do (pin-card! false) state))))
 
 (defn- applet-shift? []
   (try

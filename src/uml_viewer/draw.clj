@@ -165,7 +165,7 @@
         (nil? sel)
         (do
           (rgb theme/muted)
-          (q/text "Click a class or package.\nScroll vertically; Shift-scroll horizontally.\nArrow keys also pan.\nR reloads the EDN file."
+          (q/text "Click a class or package.\nDouble-click a class for its card.\nScroll vertically; Shift-scroll horizontally.\nArrow keys also pan.\nR reloads the EDN file."
                   (+ x 16) 48))
 
         (= :class (:kind sel))

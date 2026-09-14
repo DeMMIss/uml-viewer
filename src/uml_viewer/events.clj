@@ -98,9 +98,7 @@
 (defn on-press [state x y]
   (let [[wx wy] (world-xy state x y)
         hit (hit/at (:scene state) wx wy)]
-    (if (= :class (:kind hit))
-      (select-class state (:id hit))
-      (assoc state :selected hit))))
+    (assoc state :selected hit)))
 
 (defn on-scroll [state amount opts]
   (let [opts (if (map? opts) opts {:window-h opts :window-w 1500})
