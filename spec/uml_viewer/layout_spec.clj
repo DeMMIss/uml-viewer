@@ -60,6 +60,21 @@
           bot (first (filter #(= :bot (:id %)) (:packages scene)))]
       (should (< (:y (:rect top)) (:y (:rect bot))))))
 
+  (it "stacks packages in document order even when a later package holds the interface"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :impl
+                 :label "Impl"
+                 :classes [{:id :child :name "Child"}]}
+                {:id :iface
+                 :label "Iface"
+                 :classes [{:id :parent :name "Parent" :stereotype :interface}]}]
+               :edges [{:from :child :to :parent :kind :implements}]})
+          scene (layout/layout d)
+          impl (first (filter #(= :impl (:id %)) (:packages scene)))
+          iface (first (filter #(= :iface (:id %)) (:packages scene)))]
+      (should (< (:y (:rect impl)) (:y (:rect iface))))))
+
   (it "keeps class boxes inside their package"
     (let [scene (layout/layout (ir/load-diagram "examples/library.edn"))]
       (doseq [c (:classes scene)]

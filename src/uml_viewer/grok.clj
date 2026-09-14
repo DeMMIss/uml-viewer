@@ -1,15 +1,18 @@
 (ns uml-viewer.grok
   (:require [clojure.java.io :as io]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [uml-viewer.theme :as theme]))
 
 (def standing-rules
   (str "You are working in the uml-viewer project. The diagram is already on screen.\n"
-       "After you change Clojure source:\n"
-       "- Update examples/uml-viewer.edn if packages, classes, or edges changed.\n"
-       "  Keep that file topology-only (no authored CRAP/coverage/killed numbers).\n"
-       "- Do not start the viewer; it reloads when the EDN mtime changes.\n"
-       "If the user asked to recompute CRAP or mutation metrics, run\n"
-       "`clj -M:crap` and `clj -M:mutate` on the affected files under src/.\n"
+       "After every change to Clojure source or the policy, always:\n"
+       "1. Edit examples/uml-viewer.policy.edn only if layering, diagrams, or\n"
+       "   association-vs-dependency changed. Do not edit examples/uml-viewer.edn.\n"
+       "2. Run clj -M:crap.\n"
+       "3. Run clj -M:mutate on each changed file under src/ (differential:\n"
+       "   snapshots skip unchanged forms).\n"
+       "4. Run clj -M:ir so the viewer reloads topology and the new .metrics/.\n"
+       "Do not start the viewer; it reloads when the EDN mtime changes.\n"
        "Do not commit or push unless asked.\n"))
 
 (defn grok-executable
@@ -27,10 +30,6 @@
                        candidates))
         "grok")))
 
-(defn wrap-prompt
-  [user-text]
-  (str standing-rules "\nDirective:\n" (str/trim (or user-text ""))))
-
 (def session-name "uml-viewer-grok")
 
 (defn tmux!
@@ -41,26 +40,94 @@
       (.waitFor p))
     (catch Exception _ 1)))
 
+(defn rgb-16
+  "Terminal.app AppleScript colors are 16-bit (0–65535)."
+  [[r g b]]
+  [(* (int r) 257) (* (int g) 257) (* (int b) 257)])
+
+(defn- applescript-rgb [c]
+  (let [[r g b] (rgb-16 c)]
+    (str "{" r ", " g ", " b "}")))
+
 (defn new-session-args
   [cwd]
   ["new-session" "-d" "-s" session-name "-c" cwd
-   (grok-executable) "--yolo" "--trust"])
+   "-e" "GROK_THEME=terminal"
+   "-e" "GROK_TERMINAL_THEME=1"
+   "-e" "COLORTERM=truecolor"
+   (grok-executable) "--yolo" "--trust" "--rules" standing-rules
+   ";" "set-option" "status" "off"])
 
 (defn kill-session-args
   []
   ["kill-session" "-t" session-name])
+
+(def terminal-title "Grok")
+
+(defonce !terminal-window-id (atom nil))
 
 (defn attach-command
   []
   (str "tmux attach -t " session-name "; exit"))
 
 (defn osascript
-  "AppleScript that opens Terminal.app on `shell-cmd`."
+  "AppleScript that opens a Terminal window on `shell-cmd`, painted like the diagram.
+  Returns the new window id."
   [shell-cmd]
   (str "tell application \"Terminal\"\n"
        "activate\n"
-       "do script " (pr-str shell-cmd) "\n"
+       "set grokTab to do script " (pr-str shell-cmd) "\n"
+       "set background color of grokTab to " (applescript-rgb theme/bg) "\n"
+       "set normal text color of grokTab to " (applescript-rgb theme/ink) "\n"
+       "set bold text color of grokTab to " (applescript-rgb theme/gold) "\n"
+       "set cursor color of grokTab to " (applescript-rgb theme/gold) "\n"
+       "set font name of grokTab to \"Menlo\"\n"
+       "set font size of grokTab to 13\n"
+       "set custom title of grokTab to \"" terminal-title "\"\n"
+       "set title displays custom title of grokTab to true\n"
+       "set title displays device name of grokTab to false\n"
+       "set title displays shell path of grokTab to false\n"
+       "set title displays settings name of grokTab to false\n"
+       "return id of front window\n"
        "end tell"))
+
+(defn close-terminal-script
+  "AppleScript that closes the Grok Terminal window. Does not launch Terminal."
+  ([] (close-terminal-script nil))
+  ([win-id]
+   (str "tell application \"System Events\"\n"
+        "if not (exists process \"Terminal\") then return\n"
+        "end tell\n"
+        "tell application \"Terminal\"\n"
+        (when win-id
+          (str "try\n"
+               "close (first window whose id is " win-id ") saving no\n"
+               "end try\n"))
+        "repeat with w in (get windows)\n"
+        "try\n"
+        "if custom title of selected tab of w is \"" terminal-title "\" then\n"
+        "close w saving no\n"
+        "end if\n"
+        "end try\n"
+        "end repeat\n"
+        "end tell")))
+
+(defn run-osascript
+  "Run `script` with osascript. Returns trimmed stdout, or \"\"."
+  [script]
+  (try
+    (let [p (.start (doto (ProcessBuilder. (into-array String ["osascript" "-e" script]))
+                      (.redirectErrorStream true)))
+          out (slurp (.getInputStream p))]
+      (.waitFor p)
+      (str/trim out))
+    (catch Exception _ "")))
+
+(defn close-terminal-window!
+  "Close the Terminal window that attached to the grok session."
+  []
+  (run-osascript (close-terminal-script @!terminal-window-id))
+  (reset! !terminal-window-id nil))
 
 (defn open-in-terminal!
   "Start grok in tmux session uml-viewer-grok and attach a Terminal window."
@@ -72,109 +139,13 @@
        (binding [*out* *err*]
          (println "UML viewer: could not start tmux session" session-name))))
    (let [script (osascript (attach-command))
-         proc (.start (ProcessBuilder.
-                        (into-array String ["osascript" "-e" script])))]
-     {:proc proc :script script :session session-name})))
-
-(defn- with-tty
-  "Run under script(1) so grok sees a TTY and reads Esc as in the TUI."
-  [cmd]
-  (if (.isFile (io/file "/usr/bin/script"))
-    (into ["/usr/bin/script" "-q" "/dev/null"] cmd)
-    cmd))
-
-(defn command-line
-  [user-text {:keys [cwd continue?]}]
-  (with-tty
-    (cond-> [(grok-executable)]
-      continue? (conj "-c")
-      true (conj "-p" (wrap-prompt user-text)
-                 "--cwd" (or cwd (System/getProperty "user.dir"))
-                 "--yolo"
-                 "--output-format" "plain"))))
-
-(defn touch-edn!
-  [path]
-  (let [f (io/file path)]
-    (when (.exists f)
-      (.setLastModified f (System/currentTimeMillis)))
-    path))
-
-(defonce !live-proc (atom nil))
-
-(defn- pump-chars
-  "Forward stdout as soon as bytes arrive, not only on newlines."
-  [^java.io.InputStream in on-out]
-  (let [buf (byte-array 2048)]
-    (loop []
-      (let [n (.read in buf)]
-        (when (pos? n)
-          (on-out (String. buf 0 n "UTF-8"))
-          (recur))))))
-
-(defn run-directive!
-  "Start grok in a future. `on-out` gets stdout chunks; `on-done` gets {:exit n}.
-  Returns the Future. Store `!proc` (atom) to allow cancel via destroy."
-  [{:keys [prompt cwd continue? on-out on-done !proc]
-    :or {on-out identity on-done identity}}]
-  (future
-    (try
-      (let [cwd (or cwd (System/getProperty "user.dir"))
-            cmd (command-line prompt {:cwd cwd :continue? continue?})
-            proc (.start (doto (ProcessBuilder. (into-array String cmd))
-                           (.directory (io/file cwd))
-                           (.redirectErrorStream true)))]
-        (when !proc (reset! !proc proc))
-        (reset! !live-proc proc)
-        (on-out (str "Running grok in " cwd " …\n"))
-        (let [pump (future
-                     (try
-                       (pump-chars (.getInputStream proc) on-out)
-                       (catch Exception _)))]
-          (let [code (.waitFor proc)]
-            (deref pump 2000 nil)
-            (when !proc (reset! !proc nil))
-            (compare-and-set! !live-proc proc nil)
-            (on-done {:exit code}))))
-      (catch Exception e
-        (when !proc (reset! !proc nil))
-        (reset! !live-proc nil)
-        (on-out (str "Grok failed: " (.getMessage e) "\n"))
-        (on-done {:exit 1 :error e})))))
-
-(def esc-byte (byte 0x1b))
-
-(defn write-escapes!
-  "Write two Esc bytes to a stream. Does not close or kill anything."
-  [^java.io.OutputStream out]
-  (let [esc (byte-array [esc-byte])]
-    (.write out esc)
-    (.flush out)
-    (.write out esc)
-    (.flush out))
-  out)
-
-(defn interrupt!
-  "Send Esc Esc on grok's stdin. Does not destroy the process."
-  [!proc]
-  (when-let [p (and !proc @!proc)]
-    (try
-      (write-escapes! (.getOutputStream p))
-      (catch Exception _))
-    true))
-
-(defn cancel!
-  [!proc]
-  (interrupt! !proc))
+         out (run-osascript script)
+         win-id (re-find #"\d+" out)]
+     (reset! !terminal-window-id win-id)
+     {:script script :session session-name :window-id win-id})))
 
 (defn shutdown-children!
-  "Kill the grok tmux session and any ProcessBuilder grok child."
+  "Kill the grok tmux session and close its Terminal window."
   []
   (apply tmux! (kill-session-args))
-  (when-let [p @!live-proc]
-    (try
-      (interrupt! !live-proc)
-      (Thread/sleep 400)
-      (.destroyForcibly p)
-      (catch Exception _))
-    (reset! !live-proc nil)))
+  (close-terminal-window!))

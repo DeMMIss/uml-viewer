@@ -182,56 +182,22 @@
      :rect pack-rect
      :classes inner}))
 
-(defn- package-ranks [diagram]
-  (let [cp (into {} (for [p (:packages diagram)
-                          c (:classes p)]
-                      [(:id c) (:id p)]))
-        pkgs (mapv :id (:packages diagram))
-        cross (fn [e]
-                (let [fp (cp (:from e))
-                      tp (cp (:to e))]
-                  (when (and fp tp (not= fp tp)) [fp tp])))
-        inherit (keep #(when (inherit-edge? %) (cross %)) (:edges diagram))
-        downward (keep #(when-not (inherit-edge? %) (cross %)) (:edges diagram))]
-    (loop [rank (zipmap pkgs (repeat 0)) n 0]
-      (if (> n (* 2 (count pkgs)))
-        rank
-        (let [next (-> rank
-                       (as-> r (reduce (fn [r [child parent]]
-                                         (assoc r child (max (r child) (inc (r parent)))))
-                                       r inherit))
-                       (as-> r (reduce (fn [r [from to]]
-                                         (assoc r to (max (r to) (inc (r from)))))
-                                       r downward)))]
-          (if (= next rank) rank (recur next (inc n))))))))
-
 (defn layout
-  "Content-size classes, Sugiyama-place them inside packages, stack packages by rank."
+  "Content-size classes, Sugiyama-place them inside packages, stack packages
+   in document order."
   [diagram]
   (let [edges (:edges diagram)
         direction (:direction diagram :tb)
-        ranks (package-ranks diagram)
-        stride (inc (apply max 1 (map #(count (:classes %)) (:packages diagram))))
-        grouped (->> (:packages diagram)
-                     (group-by #(ranks (:id %)))
-                     (sort-by key))
+        pkgs (:packages diagram)
+        stride (inc (apply max 1 (map #(count (:classes %)) pkgs)))
         laid (second
                (reduce
-                 (fn [[y packs] [_ pkgs]]
-                   (let [placed (second
-                                  (reduce
-                                    (fn [[x acc] pkg]
-                                      (let [base (* (ranks (:id pkg) 0) stride)
-                                            lp (layout-package pkg x y edges direction base)]
-                                        [(+ x (get-in lp [:rect :w]) m/pack-gap)
-                                         (conj acc lp)]))
-                                    [m/margin []]
-                                    pkgs))
-                         row-h (apply max 0 (map #(get-in % [:rect :h]) placed))]
-                     [(+ y row-h m/rank-gap)
-                      (into packs placed)]))
+                 (fn [[y packs] [i pkg]]
+                   (let [lp (layout-package pkg m/margin y edges direction (* i stride))]
+                     [(+ y (get-in lp [:rect :h]) m/rank-gap)
+                      (conj packs lp)]))
                  [m/margin []]
-                 grouped))
+                 (map-indexed vector pkgs)))
         classes (mapcat :classes laid)
         bounds (or (geom/union (map :rect laid))
                    (geom/rect 0 0 400 300))]

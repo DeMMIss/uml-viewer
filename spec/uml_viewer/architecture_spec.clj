@@ -40,6 +40,17 @@
 (defn- logic-ns? [ns-name]
   (not (quil-adapter? ns-name)))
 
+(defn- clojure-impl-lib? [sym]
+  (contains? #{'uml-viewer.source.clojure 'uml-viewer.graph.clojure} sym))
+
+(defn- adapter-layer? [ns-name]
+  (let [s (str ns-name)]
+    (and (str/starts-with? s "uml-viewer.")
+         (not (str/starts-with? s "uml-viewer.main."))
+         (not (contains? #{"uml-viewer.source.clojure"
+                           "uml-viewer.graph.clojure"}
+                         s)))))
+
 (defn- violations [from-pred to-pred]
   (for [file (source-files)
         :let [ns-form (read-ns-form file)
@@ -62,4 +73,15 @@
                                          "uml-viewer.source.clojure"
                                          "uml-viewer.grok"} (str %))
                             #(or (quil-lib? %)
-                                 (#{'javax.swing 'java.awt} %))))))
+                                 (#{'javax.swing 'java.awt} %)))))
+
+  (it "keeps the language graph and policy free of Swing and Quil"
+    (should= [] (violations #(contains? #{"uml-viewer.graph"
+                                         "uml-viewer.graph.clojure"
+                                         "uml-viewer.policy"
+                                         "uml-viewer.ir-generator"} (str %))
+                            #(or (quil-lib? %)
+                                 (#{'javax.swing 'java.awt} %)))))
+
+  (it "keeps adapters free of clojure implementations"
+    (should= [] (violations adapter-layer? clojure-impl-lib?))))

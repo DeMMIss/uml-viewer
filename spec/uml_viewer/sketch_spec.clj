@@ -235,17 +235,22 @@
       (should-be-nil (:hover (call 'detail-mouse-moved {:scroll 0} {:y 0})))
       (should= {:hover nil} (call 'detail-mouse-exited {:hover :go} :evt))))
 
-  (it "opens source for a member and picks a related class"
+  (it "opens source on double-click of a member and picks a related class"
     (let [model (a-model)
           rows (detail/rows model)
           go (first (filter :op-name rows))
           rel (first (filter #(= :rel (:kind %)) rows))
-          opened (atom nil)]
+          opened (atom nil)
+          go-y (+ (:y go) 1)]
       (should= {:scroll 0} (call 'detail-mouse-pressed {:scroll 0} {:y 0}))
       (reset! sketch/!bridge {:model model})
-      (with-redefs [source-window/open-member-window! (fn [ns op]
+      (with-redefs [source-window/open-member-window! (fn [_src ns op]
                                                         (reset! opened [ns op]))]
-        (call 'detail-mouse-pressed {:scroll 0} {:y (+ (:y go) 1)})
+        (call 'detail-mouse-pressed {:scroll 0} {:y go-y})
+        (should-be-nil @opened)
+        (call 'detail-mouse-pressed {:scroll 0} {:y go-y :count 1})
+        (should-be-nil @opened)
+        (call 'detail-mouse-pressed {:scroll 0} {:y go-y :count 2})
         (should= [(:ns model) "go"] @opened)
         (call 'detail-mouse-pressed {:scroll 0} {:y (+ (:y rel) 1)})
         (should= (:id rel) (:pick @sketch/!bridge))
@@ -417,7 +422,7 @@
       (with-redefs [q/sketch (fn [& args]
                                (reset! opts (apply hash-map args))
                                :main-applet)]
-        (should= :main-applet (sketch/start! "doc.edn"))
+        (should= :main-applet (sketch/start! "doc.edn" :source-impl))
         (should= "UML viewer" (:title @opts))
         (should= [sketch/window-width sketch/window-height] (:size @opts))
         (quiet-quil

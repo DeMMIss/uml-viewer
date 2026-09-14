@@ -125,8 +125,12 @@
   (it "reads a diagram from an EDN string"
     (should= "Tiny" (:title (ir/read-diagram "{:title \"Tiny\" :packages [{:id :p :label \"P\" :classes [{:id :a :name \"A\"}]}] :edges []}"))))
 
-  (it "loads the viewer document as layer diagrams"
-    (let [doc (ir/load-document "examples/uml-viewer.edn")]
-      (should= "UML viewer" (:title doc))
-      (should= ["Layers" "Domain" "Engine" "Application" "Adapters"]
-               (map :title (:diagrams doc))))))
+  (it "loads a document of stacked diagrams"
+    (let [f (java.io.File/createTempFile "uml" ".edn")]
+      (spit f (str "{:title \"Doc\" :diagrams ["
+                   "{:title \"One\" :packages [{:id :p :label \"P\" :classes [{:id :a :name \"A\"}]}] :edges []}"
+                   "{:title \"Two\" :packages [{:id :p :label \"P\" :classes [{:id :a :name \"A\"}]}] :edges []}"
+                   "]}"))
+      (let [doc (ir/load-document (.getPath f))]
+        (should= "Doc" (:title doc))
+        (should= ["One" "Two"] (map :title (:diagrams doc)))))))

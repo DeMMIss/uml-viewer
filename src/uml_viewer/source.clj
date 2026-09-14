@@ -22,20 +22,26 @@
   [lang]
   (get @languages lang))
 
+(defn- from-impl [impl ident lang]
+  (when impl
+    (when-let [path (locate impl ident)]
+      (let [src (slurp path)]
+        (when (extract impl src ident)
+          {:title (str path ":" (or (start-line impl src ident) 1))
+           :file path
+           :body src
+           :line (start-line impl src ident)
+           :lang lang})))))
+
 (defn member-source
   "Locate a member. `ident` is a map with at least `:name`.
-  `:lang` selects the extractor (default `:clojure`). Returns
-  `{:title :file :body :line :lang}` — `body` is the whole file,
+  One-arg form looks up the extractor by `:lang` (default `:clojure`).
+  Two-arg form takes a `LanguageSource` impl, or a lang keyword.
+  Returns `{:title :file :body :line :lang}` — `body` is the whole file,
   `line` is where the member starts — or nil."
   ([ident]
    (member-source (or (:lang ident) :clojure) ident))
-  ([lang ident]
-   (when-let [impl (lookup lang)]
-     (when-let [path (locate impl ident)]
-       (let [src (slurp path)]
-         (when (extract impl src ident)
-           {:title (str path ":" (or (start-line impl src ident) 1))
-            :file path
-            :body src
-            :line (start-line impl src ident)
-            :lang lang}))))))
+  ([lang-or-impl ident]
+   (if (keyword? lang-or-impl)
+     (from-impl (lookup lang-or-impl) ident lang-or-impl)
+     (from-impl lang-or-impl ident (or (:lang ident) :clojure)))))

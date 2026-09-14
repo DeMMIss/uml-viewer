@@ -1,6 +1,5 @@
 (ns uml-viewer.source-window
   (:require [uml-viewer.source :as source]
-            [uml-viewer.source.clojure]
             [uml-viewer.source-html :as source-html])
   (:import [java.awt Dimension]
            [javax.swing JEditorPane JFrame JScrollPane SwingUtilities]))
@@ -25,12 +24,13 @@
 
 (defn open-member-window!
   "Open an independent source window for a member.
-  `ident` is a source identity map, or `ns-name` plus `member-name`."
-  ([ident]
-   (when-let [{:keys [title body line]} (source/member-source ident)]
+  `source-impl` satisfies `LanguageSource`. `ident` is a source identity
+  map, or `ns-name` plus `member-name`."
+  ([source-impl ident]
+   (when-let [{:keys [title body line]} (source/member-source source-impl ident)]
      (SwingUtilities/invokeLater
        (fn []
          (build-frame! title body line)))
      true))
-  ([ns-name member-name]
-   (open-member-window! {:lang :clojure :ns ns-name :name member-name})))
+  ([source-impl ns-name member-name]
+   (open-member-window! source-impl {:ns ns-name :name member-name})))

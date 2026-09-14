@@ -1,13 +1,13 @@
 # UML viewer
 
-The diagram is already on screen. After you change Clojure source:
+The diagram is already on screen.
 
-- Update `examples/uml-viewer.edn` if packages, classes, or edges changed.
-  Keep that file topology-only (no authored CRAP/coverage/killed numbers).
+- Do **not** edit `examples/uml-viewer.edn`. It is generated from
+  `examples/uml-viewer.policy.edn` via `clj -M:ir`.
+- If layering, diagrams, or association-vs-dependency changed, edit the
+  policy then run `clj -M:ir`.
+- A class under **Unassigned** means add it to a package `:nses` and regenerate.
 - Do not start the viewer; it reloads when the EDN mtime changes.
-
-If the user asked to recompute CRAP or mutation metrics, run `clj -M:crap`
-and `clj -M:mutate` on the affected files under `src/`.
 
 Do not commit or push unless asked. Esc interrupts a turn in this terminal;
 do not kill the process on interrupt.

@@ -136,8 +136,12 @@
           (should (some #(= kept-name (:name %)) (:classes (:scene next)))))))))
 
 (describe "document"
-  (it "stacks layer diagrams top to bottom"
-    (let [scene (events/compile-document (ir/load-document "examples/uml-viewer.edn"))
+  (it "stacks diagrams top to bottom"
+    (let [d {:packages [{:id :p :label "P" :classes [{:id :a :name "A"}]}] :edges []}
+          doc {:title "Doc"
+               :diagrams [(assoc (ir/normalize d) :title "One")
+                          (assoc (ir/normalize d) :title "Two")]}
+          scene (events/compile-document doc)
           titles (map :title (:sections scene))]
-      (should= ["Layers" "Domain" "Engine" "Application" "Adapters"] titles)
+      (should= ["One" "Two"] titles)
       (should (apply < (map :title-y (:sections scene)))))))

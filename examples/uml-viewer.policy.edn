@@ -1,0 +1,45 @@
+{:title "UML viewer"
+ :src "src"
+ :prefix "uml-viewer"
+ :lang :clojure
+ :out "examples/uml-viewer.edn"
+ :packages
+ [{:id :main
+   :label "Main"
+   :nses [main.uml-viewer main.ir-generator]}
+  {:id :adapters
+   :label "Adapters"
+   :nses [draw sketch core source-window ir-generator]}
+  {:id :app
+   :label "Application"
+   :nses [events detail]}
+  {:id :engine
+   :label "Engine"
+   :nses [layout route curve compose hit]}
+  {:id :source-factory
+   :label "SourceFactory"
+   :nses [source.clojure graph.clojure]}
+  {:id :language-implementation
+   :label "LanguageImplementation"
+   :nses [graph source]}
+  {:id :domain
+   :label "Domain"
+   :nses [ir geom metrics theme overlay source-html
+          grok policy]}]
+ :diagrams
+ [{:title "Layers" :view :overview :hide-members true :direction :tb}
+  {:title "Main" :package :main
+   :edge-kinds {[:main.uml-viewer :core] :association
+                [:main.uml-viewer :source.clojure] :association
+                [:main.ir-generator :ir-generator] :association
+                [:main.ir-generator :graph.clojure] :association}}
+  {:title "Adapters" :package :adapters
+   :edge-kinds {[:core :sketch] :association}}
+  {:title "Application" :package :app
+   :edge-kinds {[:events :compose] :association}}
+  {:title "Engine" :package :engine
+   :edge-kinds {[:compose :layout] :association
+                [:compose :route] :association}}
+  {:title "SourceFactory" :package :source-factory}
+  {:title "LanguageImplementation" :package :language-implementation}
+  {:title "Domain" :package :domain}]}
