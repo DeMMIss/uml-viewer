@@ -26,4 +26,24 @@
     (let [u (geom/union [(geom/rect 0 0 10 10) (geom/rect 5 5 10 10)])]
       (should= 0 (:x u))
       (should= 15 (:w u))
-      (should= 15 (:h u)))))
+      (should= 15 (:h u))))
+
+  (it "opens a pad-sized gap where a line passes through a class"
+    (let [r (geom/rect 40 0 20 20)
+          paths (geom/gap-polyline [[0 10] [100 10]] [r] 5)
+          left (first paths)
+          right (last paths)]
+      (should= 2 (count paths))
+      (should= [0.0 10.0] (mapv double (first left)))
+      (should= 35.0 (first (last left)))
+      (should= 65.0 (first (first right)))
+      (should= [100.0 10.0] (mapv double (last right)))))
+
+  (it "does not gap a line that misses the class"
+    (let [r (geom/rect 40 40 20 20)]
+      (should= [[[0 10] [100 10]]]
+               (geom/gap-polyline [[0 10] [100 10]] [r] 5))))
+
+  (it "keeps an unobstructed polyline as one path"
+    (should= [[[0 0] [10 0] [10 10]]]
+             (geom/gap-polyline [[0 0] [10 0] [10 10]] [] 5))))

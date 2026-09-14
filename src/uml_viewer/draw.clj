@@ -47,27 +47,16 @@
         (q/line x y x1 y1)
         (q/line x y x2 y2)))))
 
-(defn- draw-ops [start ops]
-  (loop [cur start ops ops]
-    (when (seq ops)
-      (let [op (first ops)
-            nxt (:p op)]
-        (case (:op op)
-          :line (q/line (first cur) (second cur)
-                        (first (:p op)) (second (:p op)))
-          :cubic (q/bezier (first cur) (second cur)
-                           (first (:c1 op)) (second (:c1 op))
-                           (first (:c2 op)) (second (:c2 op))
-                           (first (:p op)) (second (:p op)))
-          :quad (let [c1 [(+ (first cur) (* 2/3 (- (first (:c op)) (first cur))))
-                          (+ (second cur) (* 2/3 (- (second (:c op)) (second cur))))]
-                      c2 [(+ (first (:p op)) (* 2/3 (- (first (:c op)) (first (:p op)))))
-                          (+ (second (:p op)) (* 2/3 (- (second (:c op)) (second (:p op)))))]]
-                  (q/bezier (first cur) (second cur)
-                            (first c1) (second c1)
-                            (first c2) (second c2)
-                            (first (:p op)) (second (:p op)))))
-        (recur nxt (rest ops))))))
+(defn- draw-polyline [pts]
+  (doseq [[[x1 y1] [x2 y2]] (partition 2 1 pts)]
+    (q/line x1 y1 x2 y2)))
+
+(defn- obstacle-rects [scene e]
+  (let [ends #{(:from e) (:to e)}]
+    (mapv :rect
+          (remove (fn [c]
+                    (or (:dummy? c) (contains? ends (:id c))))
+                  (:classes scene)))))
 
 (defn- draw-edge [e selected? scene]
   (let [pts (vec (:points e))]
@@ -79,8 +68,12 @@
             to (hit/class-by-id scene (:to e))
             path (-> (curve/basis-path pts)
                      (curve/constrain-ends (:rect from) (:rect to)))
-            [behind tip] (curve/end-tangent path)]
-        (draw-ops (:start path) (:ops path))
+            [behind tip] (curve/end-tangent path)
+            samples (curve/flatten-path path)
+            obstacles (obstacle-rects scene e)
+            strokes (geom/gap-polyline samples obstacles m/under-gap)]
+        (doseq [sub strokes]
+          (draw-polyline sub))
         (when (:head e)
           (arrowhead (:head e) tip behind))))))
 
@@ -130,7 +123,7 @@
 (defn- draw-sidebar [state]
   (let [w (q/width)
         h (q/height)
-        sw 280
+        sw m/sidebar-w
         x (- w sw)]
     (rgb [18 22 24] 230)
     (q/no-stroke)

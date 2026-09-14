@@ -115,15 +115,13 @@
       {:from-face :left :to-face :right})))
 
 (defn- flow-faces [from to lr?]
-  (let [rf (:rank from 0)
-        rt (:rank to 0)]
-    (if lr?
-      (if (<= rf rt)
-        {:from-face :right :to-face :left}
-        {:from-face :left :to-face :right})
-      (if (<= rf rt)
-        {:from-face :bottom :to-face :top}
-        {:from-face :top :to-face :bottom}))))
+  (if lr?
+    (if (<= (geom/cx (:rect from)) (geom/cx (:rect to)))
+      {:from-face :right :to-face :left}
+      {:from-face :left :to-face :right})
+    (if (<= (geom/cy (:rect from)) (geom/cy (:rect to)))
+      {:from-face :bottom :to-face :top}
+      {:from-face :top :to-face :bottom})))
 
 (defn- side-faces [side]
   (case side
@@ -349,9 +347,17 @@
   (let [{:keys [from-face to-face]} (flow-faces from to lr?)
         start (port from from-face from-t)
         end (port to to-face to-t)
-        ch (channel classes (:rank from 0) (:rank to 0) lr?)
-        primary (when ch (through-channel start end ch i n lr?))
-        alt (when ch (through-channel start end ch (- n i 1) n lr?))
+        ch (or (channel classes (:rank from 0) (:rank to 0) lr?)
+               (let [a (:rect from) b (:rect to)]
+                 (if lr?
+                   (let [lo (min (geom/right a) (geom/right b))
+                         hi (max (:x a) (:x b))]
+                     {:lo lo :hi hi :span (- hi lo)})
+                   (let [lo (min (geom/bottom a) (geom/bottom b))
+                         hi (max (:y a) (:y b))]
+                     {:lo lo :hi hi :span (- hi lo)}))))
+        primary (through-channel start end ch i n lr?)
+        alt (through-channel start end ch (- n i 1) n lr?)
         via (through-intermediates from to start end classes i lr?)]
     (remove nil? [primary via alt (collapse [start end])])))
 

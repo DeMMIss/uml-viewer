@@ -151,10 +151,11 @@
           [0 []]
           groups)))))
 
-(defn- layout-package [pkg origin-x origin-y edges direction]
+(defn- layout-package [pkg origin-x origin-y edges direction rank-base]
   (let [inner (place-classes (:classes pkg) edges direction)
         inner (mapv #(assoc %
                        :package (:id pkg)
+                       :rank (+ rank-base (:rank % 0))
                        :rect (geom/rect (+ origin-x m/pad (get-in % [:rect :x]))
                                         (+ origin-y m/banner-h m/pad (get-in % [:rect :y]))
                                         (get-in % [:rect :w])
@@ -208,6 +209,7 @@
   (let [edges (:edges diagram)
         direction (:direction diagram :tb)
         ranks (package-ranks diagram)
+        stride (inc (apply max 1 (map #(count (:classes %)) (:packages diagram))))
         grouped (->> (:packages diagram)
                      (group-by #(ranks (:id %)))
                      (sort-by key))
@@ -217,7 +219,8 @@
                    (let [placed (second
                                   (reduce
                                     (fn [[x acc] pkg]
-                                      (let [lp (layout-package pkg x y edges direction)]
+                                      (let [base (* (ranks (:id pkg) 0) stride)
+                                            lp (layout-package pkg x y edges direction base)]
                                         [(+ x (get-in lp [:rect :w]) m/pack-gap)
                                          (conj acc lp)]))
                                     [m/margin []]

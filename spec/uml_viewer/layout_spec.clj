@@ -102,6 +102,27 @@
       (should= 5 (count outs))
       (should= 5 (count (distinct mids)))))
 
+  (it "leaves a downward cross-package edge from the source bottom"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :up :label "Up"
+                 :classes [{:id :root :name "Root"}
+                           {:id :src :name "Src"}]}
+                {:id :down :label "Down"
+                 :classes [{:id :dst :name "Dst"}]}]
+               :edges [{:from :root :to :src :kind :association}
+                       {:from :src :to :dst :kind :dependency}]})
+          scene (route/route (layout/layout d))
+          src (first (filter #(= :src (:id %)) (:classes scene)))
+          dst (first (filter #(= :dst (:id %)) (:classes scene)))
+          e (first (filter #(and (= :src (:from %)) (= :dst (:to %)))
+                           (:edges scene)))
+          p0 (first (:points e))
+          p1 (second (:points e))]
+      (should (< (geom/cy (:rect src)) (geom/cy (:rect dst))))
+      (should (<= (abs (- (second p0) (geom/bottom (:rect src)))) 1.51))
+      (should (>= (- (second p1) (second p0)) -0.51))))
+
   (it "does not reverse at the start of a long same-rank detour"
     (let [d (ir/normalize
               {:direction :lr

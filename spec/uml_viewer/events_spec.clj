@@ -2,7 +2,8 @@
   (:require [speclj.core :refer :all]
             [uml-viewer.events :as events]
             [uml-viewer.geom :as geom]
-            [uml-viewer.ir :as ir]))
+            [uml-viewer.ir :as ir]
+            [uml-viewer.metrics :as m]))
 
 (defn scene []
   (events/compile-diagram
@@ -43,6 +44,12 @@
     (let [s (assoc (state) :scene {:size {:h 800 :w 4000}})
           next (events/on-scroll s 2 {:horizontal? true :window-w 900 :window-h 800})]
       (should= 96 (:cam-x next))))
+
+  (it "pans far enough to slide content out from under the inspector"
+    (let [s (assoc (state) :scene {:size {:h 800 :w 1400}})
+          next (events/on-scroll s 100 {:horizontal? true :window-w 1500 :window-h 800})
+          view-w (- 1500 m/sidebar-w)]
+      (should= (- 1400 view-w) (:cam-x next))))
 
   (it "reloads on r by clearing mtime"
     (should= 0 (:mtime (events/on-key (assoc (state) :mtime 99) :r))))

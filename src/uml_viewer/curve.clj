@@ -153,3 +153,27 @@
   (-> path
       (constrain-start start-r)
       (constrain-end end-r)))
+
+(defn- cubic-at [[x0 y0] [x1 y1] [x2 y2] [x3 y3] t]
+  (let [u (- 1.0 t)
+        a (* u u u)
+        b (* 3.0 u u t)
+        c (* 3.0 u t t)
+        d (* t t t)]
+    [(+ (* a x0) (* b x1) (* c x2) (* d x3))
+     (+ (* a y0) (* b y1) (* c y2) (* d y3))]))
+
+(defn flatten-path
+  "Sample `path` into a polyline. `step` is the cubic parameter increment."
+  ([path] (flatten-path path 0.0625))
+  ([{:keys [start ops]} step]
+   (loop [cur start ops ops out [start]]
+     (if (empty? ops)
+       out
+       (let [op (first ops)
+             nxt (:p op)]
+         (if (= :cubic (:op op))
+           (recur nxt (rest ops)
+                  (into out (map #(cubic-at cur (:c1 op) (:c2 op) nxt %)
+                                 (rest (range 0.0 1.0000001 step)))))
+           (recur nxt (rest ops) (conj out nxt))))))))

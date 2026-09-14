@@ -66,6 +66,13 @@
           constrained (curve/end-tangent (curve/constrain-ends path nil box))]
       (should= (mapv double (second raw)) (mapv double (second constrained)))))
 
+  (it "samples a path from the first waypoint to the last"
+    (let [path (curve/basis-path [[0 0] [0 40] [80 40] [80 80]])
+          pts (curve/flatten-path path)]
+      (should= [0.0 0.0] (mapv double (first pts)))
+      (should= [80.0 80.0] (mapv double (last pts)))
+      (should (> (count pts) 4))))
+
   (it "meets class edges at 45 degrees or steeper"
     (let [scene (route/route (layout/layout
                               (ir/normalize

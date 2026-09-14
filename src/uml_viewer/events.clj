@@ -3,6 +3,7 @@
             [uml-viewer.hit :as hit]
             [uml-viewer.ir :as ir]
             [uml-viewer.layout :as layout]
+            [uml-viewer.metrics :as m]
             [uml-viewer.route :as route]))
 
 (defn compile-diagram [diagram]
@@ -56,7 +57,8 @@
                  (map? amount) (or (:count amount) 0)
                  :else 0)
         size (get-in state [:scene :size] {:w 800 :h 600})
-        max-x (max 0 (- (:w size) window-w))
+        view-w (max 0 (- window-w m/sidebar-w))
+        max-x (max 0 (- (:w size) view-w))
         max-y (max 0 (- (:h size) window-h))]
     (if horizontal?
       (update state :cam-x #(max 0 (min max-x (+ % (* amount 48)))))

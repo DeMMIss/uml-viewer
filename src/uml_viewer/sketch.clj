@@ -44,5 +44,4 @@
     :key-pressed (fn [state event]
                    (events/on-key state (:key event)
                                  {:window-w (q/width) :window-h (q/height)}))
-    :middleware [m/fun-mode]
-    :features [:keep-on-top]))
+    :middleware [m/fun-mode]))

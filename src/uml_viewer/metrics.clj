@@ -11,6 +11,8 @@
 (def margin 40)
 (def head-size 16)
 (def lane-gap 10)
+(def sidebar-w 280)
+(def under-gap 5)
 
 (defn text-w [s]
   (* char-w (count (or s ""))))
