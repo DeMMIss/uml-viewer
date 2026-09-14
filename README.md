@@ -4,6 +4,12 @@ A live Quil app that lays out and draws UML class diagrams from an EDN IR.
 An agent (or a human) writes the IR; this tool displays it, routes the arrows,
 colors CRAP, and lets you click.
 
+The IR is **topology**: diagrams, packages, classes, fields, ops you listed,
+and edges. **Metrics** (CC, coverage, CRAP, killed/survived) come from
+`.metrics/` snapshots produced by [crap4clj](https://github.com/unclebob/crap4clj)
+and [clj-mutate](https://github.com/unclebob/clj-mutate). The viewer overlays
+those files at load, keyed by namespace + function name.
+
 ## Run
 
 Needs Clojure CLI and Java 21+.
@@ -11,24 +17,34 @@ Needs Clojure CLI and Java 21+.
 ```bash
 clj -M:run
 clj -M:run examples/library.edn
+clj -M:run examples/uml-viewer.edn
 ```
 
-- Click a class or package to inspect it. Click a class to open a detail window.
-- Scroll the mouse wheel to pan vertically; Shift-scroll (or left/right arrows) for horizontal.
-- `R` reloads the EDN file from disk (the watcher also reloads on save).
-- `Esc` clears the selection.
+- Click a class to open (or retarget) a **class card**. That click brings the
+  card in front. Click empty space on the diagram to bring the diagram in front.
+  The two windows are otherwise independent.
+- Click a package to inspect it in the sidebar.
+- Private functions (`defn-`) appear on the card (prefixed with –), not on the
+  class box. `:hide-members true` hides fields and ops on the box (used on the
+  Layers overview).
+- Scroll the mouse wheel to pan vertically; Shift-scroll (or left/right arrows)
+  for horizontal.
+- `R` reloads the EDN (the watcher also reloads on save). Overlay re-reads
+  `.metrics/` on the next load.
+- `Esc` on the diagram clears the selection. `Esc` on the card closes it.
 
 ```bash
 clj -M:spec
 clj -M:cov
-clj -M:crap
-clj -M:mutate src/uml_viewer/layout.clj
+clj -M:crap                          # writes .metrics/crap.edn
+clj -M:mutate src/uml_viewer/layout.clj   # writes .metrics/mutate/uml_viewer/layout.edn
 ```
 
-`clj -M:crap` writes `.metrics/crap.edn`. `clj -M:mutate` writes
-`.metrics/mutate/<ns>.edn` and reuses it for differential runs. The viewer
-overlays those snapshots onto the diagram at load. Rename or move of a
-function is a new form: metrics are recomputed, not matched.
+This project's `:crap` and `:mutate` aliases use `../clojure/crap4clj` and
+`../clojure/clj-mutate`. Commit `.metrics/` so a clone has numbers without
+re-running those tools.
+
+Rename or move of a function is a new form: overlay does not match old names.
 
 ## IR
 
@@ -36,22 +52,25 @@ The file is EDN. A document may contain several diagrams (one per layer),
 stacked top to bottom. Unique class `:id`s *within* a diagram; packages as
 groups; edges by kind. A single diagram (top-level `:packages`) still works.
 
+Metrics on the class card do not have to be authored. If `.metrics/` is present,
+the overlay fills CC, coverage, CRAP, killed/survived, and any functions found
+in the snapshots (including privates). Authored `:crap` / `:coverage` / `:ops`
+are the fallback when no snapshot exists.
+
+Class `:id` is mapped to namespace `uml-viewer.<id>` (or `:ns` if you set it).
+
 ```edn
 {:title "Lending library"
  :direction :tb
  :packages
  [{:id :domain
    :label "Domain"
-   :crap {:mu 1.5 :max 4.0 :sigma 0.9}
    :classes
    [{:id :book
      :name "Book"
      :stereotype :class          ;; optional: :interface :enumeration :abstract
-     :crap {:mu 1.1 :max 1.0 :sigma 0.0}
-     :coverage 0.92               ;; optional, 0–1
      :fields [{:name "isbn" :type "String"}]
-     :ops [{:name "find" :args ["isbn"] :returns "Book"
-            :coverage 0.88 :killed 6 :survived 1}]}]}]}
+     :ops [{:name "find" :args ["isbn"] :returns "Book"}]}]}
   {:id :app
    :label "Application"
    :classes
@@ -64,13 +83,18 @@ groups; edges by kind. A single diagram (top-level `:packages`) still works.
   {:from :loan :to :book :kind :association :label "borrows"}]}
 ```
 
-`:crap` may be a single number (`μ`) or `{:mu :max :sigma}`. Package and class
-color uses `μ + σ`: green at 0, gold at 12, rust at 24 and above.
+Optional authored metrics, used when snapshots are missing:
 
-`:coverage` is a ratio 0–1 on a class or op. Ops may also carry `:cc`
-(cyclomatic complexity), `:crap`, `:killed`, `:survived`, and `:private`.
-Click a class to open a detail window; private ops appear there (prefixed)
-but not on the diagram box.
+- `:crap` — a number (`μ`) or `{:mu :max :sigma}`
+- `:coverage` — ratio 0–1 on a class or op
+- `:cc`, `:killed`, `:survived`, `:private` on ops
+- `:hide-members true` — compact box (Layers overview)
+
+Package and class **color** uses `μ + σ` from the class `:crap` map (after
+overlay): green at 0, gold at 12, rust at 24 and above.
+
+On the class card, the class row shows average CRAP with a `μ` suffix and omits
+CC. Max on the header line is the worst function in the namespace, not a sum.
 
 Edge `:kind` values:
 
@@ -93,5 +117,5 @@ Layout follows Mermaid's three stages:
    only when a sibling sits in the way), then stroke with D3 `curveBasis`
    cubics. All arrows are solid grey.
 
-The engine (`ir`, `layout`, `route`, `hit`, `events`) does not depend on Quil.
-Only `draw` and `sketch` talk to Processing.
+The engine (`ir`, `layout`, `route`, `hit`, `events`, `overlay`) does not
+depend on Quil. Only `draw` and `sketch` talk to Processing.
