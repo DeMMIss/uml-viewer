@@ -5,13 +5,14 @@
             [uml-viewer.ir :as ir]
             [uml-viewer.layout :as layout]
             [uml-viewer.metrics :as m]
+            [uml-viewer.overlay :as overlay]
             [uml-viewer.route :as route]))
 
 (defn compile-diagram [diagram]
   (route/route (layout/layout diagram)))
 
 (defn compile-document [doc]
-  (compose/compile-document doc))
+  (compose/compile-document (overlay/apply-metrics doc (overlay/load-metrics))))
 
 (defn load-path [path]
   (let [file (java.io.File. path)]

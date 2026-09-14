@@ -4,343 +4,26 @@
    :packages
    [{:id :domain
      :label "Domain"
-     :crap {:mu 4.4 :max 30.1 :sigma 0.7}
-     :classes
-     [
-     {:id :ir
-        :name "Ir"
-        :hide-members true
-        :crap {:mu 5 :max 13 :sigma 3}
-        :coverage 0.803
-        :cc 71
-        :killed 23
-        :survived 0
-        :ops [
-              {:name "as-id" :private true :args ["x"] :cc 5 :crap 5 :coverage 1}
-              {:name "as-crap" :private true :args ["x"] :cc 8 :crap 8 :coverage 0.963 :killed 2 :survived 0}
-              {:name "as-coverage" :private true :args ["x"] :cc 6 :crap 6.3 :coverage 0.792 :killed 2 :survived 0}
-              {:name "as-count" :private true :args ["x"] :cc 5 :crap 5 :coverage 0.974 :killed 3 :survived 0}
-              {:name "as-cc" :private true :args ["x"] :cc 6 :crap 6.9 :coverage 0.703 :killed 4 :survived 0}
-              {:name "as-member" :private true :args ["x"] :cc 13 :crap 13 :coverage 0.973 :killed 3 :survived 0}
-              {:name "as-class" :private true :args ["c"] :cc 5 :crap 5 :coverage 0.968 :killed 1 :survived 0}
-              {:name "as-package" :private true :args ["p"] :cc 5 :crap 5 :coverage 0.933 :killed 1 :survived 0}
-              {:name "as-edge" :private true :args ["e"] :cc 4 :crap 4 :coverage 1 :killed 1 :survived 0}
-              {:name "normalize" :args ["raw"] :cc 6 :crap 7 :coverage 0.699 :killed 5 :survived 0}
-              {:name "read-diagram" :args ["s"] :cc 1 :crap 1 :coverage 1}
-              {:name "load-document" :args ["path"] :cc 4 :crap 4 :coverage 0.977 :killed 1 :survived 0}
-              {:name "load-diagram" :args ["path"] :cc 1 :crap 1 :coverage 1}
-              {:name "class-index" :args ["diagram"] :cc 1 :crap 2 :coverage 0.012}
-              {:name "package-of" :args ["diagram" "class-id"] :cc 1 :crap 1.7 :coverage 0.125}
-              ]
-        }
-{:id :geom
-        :name "Geom"
-        :hide-members true
-        :crap {:mu 4.3 :max 30.1 :sigma 6.8}
-        :coverage 0.767
-        :cc 52
-        :killed 84
-        :survived 0
-        :ops [
-              {:name "rect" :args ["x" "y" "w" "h"] :cc 1 :crap 1 :coverage 1}
-              {:name "right" :args ["r"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "bottom" :args ["r"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "cx" :args ["r"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "cy" :args ["r"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "inside?" :args ["r" "p"] :cc 2 :crap 2 :coverage 1 :killed 2 :survived 0}
-              {:name "intersect-rect" :args ["r" "outside"] :cc 6 :crap 6 :coverage 0.94 :killed 18 :survived 0}
-              {:name "segment-hits-rect?" :args ["a" "b" "r"] :cc 2 :crap 2 :coverage 1 :killed 4 :survived 0}
-              {:name "inflate" :args ["r" "pad"] :cc 1 :crap 1 :coverage 1 :killed 6 :survived 0}
-              {:name "union" :args ["rects"] :cc 2 :crap 2 :coverage 1 :killed 3 :survived 0}
-              {:name "lerp" :private true :args ["[x1" "y1"] :cc 1 :crap 1 :coverage 1 :killed 6 :survived 0}
-              {:name "overlap-param" :private true :args ["u1" "u2"] :cc 13 :crap 30.1 :coverage 0.534 :killed 26 :survived 0}
-              {:name "merge-intervals" :private true :args ["ivs"] :cc 3 :crap 5 :coverage 0.395 :killed 1 :survived 0}
-              {:name "kept-params" :private true :args ["removed"] :cc 5 :crap 7.3 :coverage 0.545 :killed 6 :survived 0}
-              {:name "near?" :private true :args ["p" "q"] :cc 1 :crap 1 :coverage 1 :killed 3 :survived 0}
-              {:name "gap-segment" :args ["a" "b" "rects" "pad"] :cc 5 :crap 5.1 :coverage 0.838 :killed 2 :survived 0}
-              {:name "gap-polyline" :args ["pts" "rects" "pad"] :cc 6 :crap 6.1 :coverage 0.851 :killed 3 :survived 0}
-              ]
-        }
-{:id :metrics
-        :name "Metrics"
-        :hide-members true
-        :crap {:mu 3.2 :max 5 :sigma 1.3}
-        :coverage 0.934
-        :cc 13
-        :killed 8
-        :survived 0
-        :ops [
-              {:name "text-w" :args ["s"] :cc 2 :crap 2 :coverage 0.9 :killed 1 :survived 0}
-              {:name "format-crap" :args ["crap"] :cc 4 :crap 4 :coverage 0.879 :killed 2 :survived 0}
-              {:name "format-coverage" :args ["p"] :cc 2 :crap 2 :coverage 1 :killed 2 :survived 0}
-              {:name "format-mutants" :args ["killed" "survived"] :cc 5 :crap 5 :coverage 0.923 :killed 3 :survived 0}
-              ]
-        }
-{:id :theme
-        :name "Theme"
-        :hide-members true
-        :crap {:mu 5 :max 5 :sigma 0}
-        :coverage 1
-        :cc 15
-        :killed 6
-        :survived 0
-        :ops [
-              {:name "risk" :private true :args ["crap"]}
-              {:name "mix" :private true :args ["a" "b" "t"]}
-              {:name "mix-rgb" :private true :args ["c1" "c2" "t"]}
-              {:name "ramp" :private true :args ["crap" "none" "green" "mid" "red"]}
-              {:name "fill-for" :args ["crap"] :cc 5 :crap 5 :coverage 1 :killed 2 :survived 0}
-              {:name "stroke-for" :args ["crap"] :cc 5 :crap 5 :coverage 1 :killed 2 :survived 0}
-              {:name "coverage-ink" :args ["p"] :cc 5 :crap 5 :coverage 1 :killed 2 :survived 0}
-              ]
-        }]}
+     :classes [{:id :ir :name "Ir" :hide-members true}
+               {:id :geom :name "Geom" :hide-members true}
+               {:id :metrics :name "Metrics" :hide-members true}
+               {:id :theme :name "Theme" :hide-members true}]}
     {:id :engine
      :label "Engine"
-     :crap {:mu 3.1 :max 14 :sigma 1.5}
-     :classes
-     [
-     {:id :layout
-        :name "Layout"
-        :hide-members true
-        :crap {:mu 3.9 :max 10 :sigma 2.9}
-        :coverage 0.981
-        :cc 43
-        :killed 77
-        :survived 0
-        :ops [
-              {:name "stereotype-line" :private true :args ["c"] :cc 2 :crap 2 :coverage 1}
-              {:name "class-lines" :args ["c"] :cc 10 :crap 10 :coverage 0.976 :killed 3 :survived 0}
-              {:name "class-box-size" :args ["c"] :cc 1 :crap 1 :coverage 1 :killed 9 :survived 0}
-              {:name "inherit-edge?" :private true :args ["e"] :cc 1 :crap 1 :coverage 1}
-              {:name "bfs-ranks" :private true :args ["ids" "edges"] :cc 7 :crap 7 :coverage 1 :killed 8 :survived 0}
-              {:name "neighbors" :private true :args ["ids" "edges"] :cc 3 :crap 3 :coverage 1 :killed 1 :survived 0}
-              {:name "barycenter-order" :private true :args ["rank-ids" "pos" "nbr"] :cc 2 :crap 2 :coverage 1 :killed 2 :survived 0}
-              {:name "place-classes" :private true :args ["classes" "edges" "direction"] :cc 4 :crap 4 :coverage 1 :killed 21 :survived 0}
-              {:name "layout-package" :private true :args ["pkg" "origin-x" "origin-y" "edges" "direction" "rank-base"] :cc 3 :crap 3 :coverage 0.923 :killed 10 :survived 0}
-              {:name "package-ranks" :private true :args ["diagram"] :cc 8 :crap 8 :coverage 0.985 :killed 14 :survived 0}
-              {:name "layout" :args ["diagram"] :cc 2 :crap 2 :coverage 0.964 :killed 9 :survived 0}
-              ]
-        }
-{:id :route
-        :name "Route"
-        :hide-members true
-        :crap {:mu 3.2 :max 8 :sigma 1.8}
-        :coverage 0.909
-        :cc 124
-        :killed 171
-        :survived 0
-        :ops [
-              {:name "class-by-id" :private true :args ["scene"] :cc 1 :crap 1 :coverage 1}
-              {:name "head" :private true :args ["kind"] :cc 8 :crap 8 :coverage 0.909}
-              {:name "port-on-t" :private true :args ["r" "face" "t"] :cc 5 :crap 5 :coverage 0.912 :killed 8 :survived 0}
-              {:name "lr?" :private true :args ["scene"] :cc 1 :crap 1 :coverage 1}
-              {:name "collinear?" :private true :args ["[x1" "y1"] :cc 4 :crap 4 :coverage 1 :killed 8 :survived 0}
-              {:name "between?" :private true :args ["a" "b" "c"] :cc 3 :crap 3 :coverage 0.972 :killed 2 :survived 0}
-              {:name "collapse" :private true :args ["pts"] :cc 7 :crap 7 :coverage 0.983 :killed 4 :survived 0}
-              {:name "path-hits?" :private true :args ["pts" "from-id" "to-id" "classes"] :cc 2 :crap 2 :coverage 1 :killed 3 :survived 0}
-              {:name "try-paths" :private true :args ["candidates" "from-id" "to-id" "classes"] :cc 3 :crap 3 :coverage 0.966}
-              {:name "rank-extent" :private true :args ["classes" "rank" "lr?" "side"] :cc 5 :crap 5 :coverage 1 :killed 8 :survived 0}
-              {:name "channel" :private true :args ["classes" "from-rank" "to-rank" "lr?"] :cc 3 :crap 3 :coverage 0.973 :killed 2 :survived 0}
-              {:name "lane-coord" :private true :args ["ch" "i" "n"] :cc 1 :crap 1 :coverage 1 :killed 6 :survived 0}
-              {:name "rank-bbox" :private true :args ["classes" "rank"] :cc 1 :crap 1 :coverage 1 :killed 2 :survived 0}
-              {:name "clamp" :private true :args ["v" "lo" "hi"] :cc 1 :crap 1 :coverage 1}
-              {:name "face-span" :private true :args ["r" "face"] :cc 3 :crap 3 :coverage 0.842}
-              {:name "overlap" :private true :args ["[a0" "a1"] :cc 2 :crap 2 :coverage 1 :killed 3 :survived 0}
-              {:name "stack-faces" :private true :args ["from" "to" "lr?"] :cc 4 :crap 4 :coverage 0.894 :killed 5 :survived 0}
-              {:name "flow-faces" :private true :args ["from" "to" "lr?"] :cc 4 :crap 4 :coverage 0.894 :killed 5 :survived 0}
-              {:name "side-faces" :private true :args ["side"] :cc 5 :crap 5.2 :coverage 0.8}
-              {:name "port" :private true :args ["node" "face" "t"] :cc 1 :crap 1 :coverage 1}
-              {:name "through-channel" :private true :args ["start" "end" "ch" "i" "n" "lr?"] :cc 2 :crap 2 :coverage 1 :killed 1 :survived 0}
-              {:name "along-stack" :private true :args ["from" "to" "from-t" "to-t" "lr?"] :cc 4 :crap 5.1 :coverage 0.594 :killed 7 :survived 0}
-              {:name "pair-u" :private true :args ["from" "to" "from-t" "to-t" "side" "i"] :cc 6 :crap 6 :coverage 0.93 :killed 6 :survived 0}
-              {:name "around-bbox" :private true :args ["bb" "start" "end" "i" "lr?"] :cc 2 :crap 2 :coverage 1 :killed 6 :survived 0}
-              {:name "via-rank" :private true :args ["classes" "rank" "start" "end" "i" "lr?"] :cc 3 :crap 3.7 :coverage 0.566 :killed 8 :survived 0}
-              {:name "through-intermediates" :private true :args ["from" "to" "start" "end" "classes" "i" "lr?"] :cc 3 :crap 3 :coverage 1 :killed 7 :survived 0}
-              {:name "same-rank-candidates" :private true :args ["from" "to" "from-t" "to-t" "i" "classes" "lr?"] :cc 4 :crap 4 :coverage 0.958 :killed 3 :survived 0}
-              {:name "attach-face" :private true :args ["r" "[x" "y"] :cc 5 :crap 5 :coverage 1 :killed 7 :survived 0}
-              {:name "slide-to-cone" :private true :args ["r" "p" "other"] :cc 3 :crap 3 :coverage 0.96 :killed 14 :survived 0}
-              {:name "sync-stub" :private true :args ["pts" "which" "p" "face"] :cc 6 :crap 6 :coverage 1 :killed 16 :survived 0}
-              {:name "constrain-attach" :private true :args ["from-r" "to-r" "pts"] :cc 2 :crap 2 :coverage 0.981 :killed 6 :survived 0}
-              {:name "face-along" :private true :args ["face" "p"] :cc 2 :crap 2 :coverage 1 :killed 1 :survived 0}
-              {:name "set-face-along" :private true :args ["face" "p" "v"] :cc 2 :crap 2 :coverage 1 :killed 1 :survived 0}
-              {:name "face-limits" :private true :args ["r" "face"] :cc 3 :crap 3 :coverage 0.932 :killed 8 :survived 0}
-              {:name "spread-group" :private true :args ["r" "face" "items"] :cc 2 :crap 2 :coverage 1 :killed 7 :survived 0}
-              {:name "apply-ports" :private true :args ["edges" "placements"] :cc 1 :crap 1 :coverage 1}
-              {:name "separate-ports" :private true :args ["scene"] :cc 2 :crap 2 :coverage 1 :killed 1 :survived 0}
-              {:name "hop-candidates" :private true :args ["from" "to" "from-t" "to-t" "i" "n" "classes" "lr?"] :cc 3 :crap 3.7 :coverage 0.565 :killed 4 :survived 0}
-              {:name "port-t" :private true :args ["groups" "sort-key"] :cc 1 :crap 1 :coverage 1 :killed 2 :survived 0}
-              {:name "route" :args ["scene"] :cc 4 :crap 4 :coverage 1 :killed 10 :survived 0}
-              ]
-        }
-{:id :curve
-        :name "Curve"
-        :hide-members true
-        :crap {:mu 5.3 :max 14 :sigma 4.4}
-        :coverage 0.887
-        :cc 51
-        :killed 105
-        :survived 0
-        :ops [
-              {:name "cubic" :private true :args ["x0" "y0" "x1" "y1" "x" "y"] :cc 1 :crap 1 :coverage 1 :killed 12 :survived 0}
-              {:name "basis-path" :args ["x" "y"] :cc 14 :crap 14 :coverage 0.982 :killed 21 :survived 0}
-              {:name "end-tangent" :args ["[start" "ops"] :cc 4 :crap 4 :coverage 1 :killed 3 :survived 0}
-              {:name "face-of" :args ["r" "[x" "y"] :cc 5 :crap 5.1 :coverage 0.87 :killed 6 :survived 0}
-              {:name "clamp-to-face-cone" :private true :args ["dx" "dy" "face" "arriving?"] :cc 12 :crap 12.6 :coverage 0.837 :killed 28 :survived 0}
-              {:name "constrain-start" :private true :args ["path" "r"] :cc 5 :crap 6.2 :coverage 0.632 :killed 10 :survived 0}
-              {:name "constrain-end" :private true :args ["path" "r"] :cc 4 :crap 4 :coverage 0.977 :killed 7 :survived 0}
-              {:name "constrain-ends" :args ["path" "start-r" "end-r"] :cc 1 :crap 1 :coverage 1}
-              {:name "cubic-at" :private true :args ["[x0" "y0"] :cc 1 :crap 1 :coverage 1 :killed 15 :survived 0}
-              {:name "flatten-path" :args ["path"] :cc 4 :crap 4 :coverage 1 :killed 3 :survived 0}
-              ]
-        }
-{:id :compose
-        :name "Compose"
-        :hide-members true
-        :crap {:mu 1 :max 1 :sigma 0}
-        :coverage 1
-        :cc 5
-        :killed 7
-        :survived 0
-        :ops [
-              {:name "qid" :private true :args ["idx" "id"] :cc 1 :crap 1 :coverage 1}
-              {:name "move-rect" :private true :args ["r" "dx" "dy"] :cc 1 :crap 1 :coverage 1 :killed 2 :survived 0}
-              {:name "qualify" :private true :args ["idx" "scene"] :cc 1 :crap 1 :coverage 1}
-              {:name "translate" :private true :args ["scene" "dx" "dy"] :cc 1 :crap 1 :coverage 1 :killed 2 :survived 0}
-              {:name "compile-document" :args ["doc"] :cc 1 :crap 1 :coverage 1 :killed 3 :survived 0}
-              ]
-        }
-{:id :hit
-        :name "Hit"
-        :hide-members true
-        :crap {:mu 2 :max 4 :sigma 1.2}
-        :coverage 1
-        :cc 8
-        :killed 6
-        :survived 0
-        :ops [
-              {:name "at" :args ["x" "y"] :cc 4 :crap 4 :coverage 1 :killed 2 :survived 0}
-              {:name "class-by-id" :args ["scene" "id"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "package-by-id" :args ["scene" "id"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "connected-edges" :args ["scene" "class-id"] :cc 2 :crap 2 :coverage 1 :killed 2 :survived 0}
-              ]
-        }]}
+     :classes [{:id :layout :name "Layout" :hide-members true}
+               {:id :route :name "Route" :hide-members true}
+               {:id :curve :name "Curve" :hide-members true}
+               {:id :compose :name "Compose" :hide-members true}
+               {:id :hit :name "Hit" :hide-members true}]}
     {:id :app
      :label "Application"
-     :crap {:mu 8.5 :max 134.6 :sigma 5.7}
-     :classes
-     [
-     {:id :events
-        :name "Events"
-        :hide-members true
-        :crap {:mu 2.8 :max 9 :sigma 2.6}
-        :coverage 0.973
-        :cc 36
-        :killed 26
-        :survived 0
-        :ops [
-              {:name "compile-diagram" :args ["diagram"] :cc 1 :crap 1 :coverage 1}
-              {:name "compile-document" :args ["doc"] :cc 1 :crap 1 :coverage 1}
-              {:name "load-path" :args ["path"] :cc 1 :crap 1 :coverage 1}
-              {:name "drop-missing-detail" :private true :args ["state"] :cc 3 :crap 3 :coverage 1}
-              {:name "maybe-reload" :args ["state"] :cc 4 :crap 4 :coverage 0.978 :killed 2 :survived 0}
-              {:name "select-class" :args ["state" "id"] :cc 2 :crap 2 :coverage 0.95 :killed 1 :survived 0}
-              {:name "close-detail" :args ["state"] :cc 1 :crap 1.5 :coverage 0.2}
-              {:name "on-detail-press" :args ["state" "model" "scroll" "y"] :cc 2 :crap 2 :coverage 0.947 :killed 1 :survived 0}
-              {:name "world-xy" :args ["state" "x" "y"] :cc 1 :crap 1 :coverage 1 :killed 2 :survived 0}
-              {:name "on-move" :args ["state" "x" "y"] :cc 1 :crap 1 :coverage 1}
-              {:name "on-press" :args ["state" "x" "y"] :cc 2 :crap 2 :coverage 1 :killed 2 :survived 0}
-              {:name "on-scroll" :args ["state" "amount" "opts"] :cc 9 :crap 9 :coverage 0.973 :killed 15 :survived 0}
-              {:name "on-key" :args ["state" "k"] :cc 8 :crap 8 :coverage 1 :killed 3 :survived 0}
-              ]
-        }
-{:id :detail
-        :name "Detail"
-        :hide-members true
-        :crap {:mu 14.2 :max 134.6 :sigma 34.9}
-        :coverage 0.848
-        :cc 65
-        :killed 22
-        :survived 0
-        :ops [
-              {:name "rel-phrase" :private true :args ["kind" "outgoing?"] :cc 21 :crap 134.6 :coverage 0.364}
-              {:name "model" :args ["scene" "id"] :cc 4 :crap 4 :coverage 0.929 :killed 2 :survived 0}
-              {:name "column-layout" :cc 3 :crap 3 :coverage 1 :killed 4 :survived 0}
-              {:name "crap-mu" :private true :args ["crap"] :cc 5 :crap 5 :coverage 0.885}
-              {:name "sum-key" :private true :args ["xs" "k"] :cc 3 :crap 3 :coverage 0.966 :killed 3 :survived 0}
-              {:name "format-num" :private true :args ["n"]}
-              {:name "format-cells" :private true :args ["[crap-mu" "cc" "coverage" "killed" "survived" "class-row?"] :cc 5 :crap 5 :coverage 1 :killed 3 :survived 0}
-              {:name "class-metrics" :private true :args ["c"] :cc 4 :crap 4 :coverage 0.94}
-              {:name "op-metrics" :private true :args ["op"]}
-              {:name "emit" :private true :args ["acc" "kind" "text" "extra"] :cc 2 :crap 2 :coverage 0.969 :killed 1 :survived 0}
-              {:name "heading" :private true :args ["acc" "label"] :cc 1 :crap 1 :coverage 1}
-              {:name "emit-table" :private true :args ["acc" "c"] :cc 1 :crap 1 :coverage 1}
-              {:name "rows" :args ["model"] :cc 11 :crap 13.6 :coverage 0.723 :killed 5 :survived 0}
-              {:name "content-h" :args ["rows"] :cc 2 :crap 5.5 :coverage 0.048}
-              {:name "rel-at" :args ["rows" "y"] :cc 3 :crap 3 :coverage 1 :killed 4 :survived 0}
-              ]
-        }]}
+     :classes [{:id :events :name "Events" :hide-members true}
+               {:id :detail :name "Detail" :hide-members true}]}
     {:id :adapters
      :label "Adapters"
-     :crap {:mu 20.6 :max 178.2 :sigma 14.8}
-     :classes
-     [
-     {:id :draw
-        :name "Draw"
-        :hide-members true
-        :crap {:mu 40.6 :max 178.2 :sigma 46.4}
-        :coverage 0.01
-        :cc 75
-        :ops [
-              {:name "rgb" :private true :args ["c"] :cc 1 :crap 1.8 :coverage 0.071}
-              {:name "stroke-rgb" :private true :args ["c"] :cc 1 :crap 1.8 :coverage 0.083}
-              {:name "arrowhead" :private true :args ["kind" "[x" "y"] :cc 5 :crap 29.5 :coverage 0.007}
-              {:name "draw-polyline" :private true :args ["pts"] :cc 1 :crap 1.9 :coverage 0.021}
-              {:name "obstacle-rects" :private true :args ["scene" "e"] :cc 2 :crap 5.6 :coverage 0.032}
-              {:name "draw-edge" :private true :args ["e" "selected?" "scene"] :cc 5 :crap 29.4 :coverage 0.009}
-              {:name "draw-package" :private true :args ["p" "selected?"] :cc 3 :crap 11.6 :coverage 0.015}
-              {:name "draw-class" :private true :args ["c" "selected?" "hovered?"] :cc 13 :crap 178.2 :coverage 0.008}
-              {:name "draw-sidebar" :private true :args ["state"] :cc 9 :crap 89.1 :coverage 0.004}
-              {:name "draw-state" :args ["state"] :cc 7 :crap 55.6 :coverage 0.003}
-              {:name "detail-row-color" :private true :args ["row"] :cc 7 :crap 44.7 :coverage 0.083}
-              {:name "cell-color" :private true :args ["row" "col"] :cc 9 :crap 83.4 :coverage 0.028}
-              {:name "draw-detail-cells" :private true :args ["row" "y"] :cc 4 :crap 19.6 :coverage 0.008}
-              {:name "draw-detail-row" :private true :args ["row"] :cc 7 :crap 54.4 :coverage 0.011}
-              {:name "draw-detail" :args ["model" "scroll"] :cc 1 :crap 1.9 :coverage 0.019}
-              ]
-        }
-{:id :sketch
-        :name "Sketch"
-        :hide-members true
-        :crap {:mu 15.9 :max 41.1 :sigma 12.9}
-        :coverage 0.063
-        :cc 36
-        :killed 2
-        :survived 0
-        :ops [
-              {:name "live?" :private true :args ["applet"] :cc 3 :crap 9.9 :coverage 0.083}
-              {:name "raise-applet!" :private true :args ["applet"]}
-              {:name "close-detail-window!" :private true :cc 3 :crap 11.2 :coverage 0.03}
-              {:name "take-flag!" :private true :args ["k"] :cc 2 :crap 5.4 :coverage 0.053}
-              {:name "detail-setup" :private true :cc 1 :crap 1.9 :coverage 0.048}
-              {:name "detail-update" :private true :args ["state"] :cc 2 :crap 5.6 :coverage 0.038}
-              {:name "detail-scroll" :private true :args ["state" "amount"] :cc 5 :crap 28.5 :coverage 0.02}
-              {:name "start-detail-window!" :private true :cc 5 :crap 29.4 :coverage 0.008}
-              {:name "ensure-detail-window!" :private true :args ["model"] :cc 3 :crap 11.4 :coverage 0.023}
-              {:name "setup" :args ["path"] :cc 1 :crap 1.9 :coverage 0.053}
-              {:name "update-state" :args ["state"] :cc 5 :crap 28.7 :coverage 0.018}
-              {:name "start!" :args ["path"] :cc 6 :crap 41.1 :coverage 0.008}
-              ]
-        }
-{:id :core
-        :name "Core"
-        :hide-members true
-        :crap {:mu 5.4 :max 5.4 :sigma 0}
-        :coverage 0.095
-        :cc 2
-        :ops [
-              {:name "-main" :args ["args"] :cc 2 :crap 5.4 :coverage 0.05}
-              ]
-        }]}]
+     :classes [{:id :draw :name "Draw" :hide-members true}
+               {:id :sketch :name "Sketch" :hide-members true}
+               {:id :core :name "Core" :hide-members true}]}]
    :edges
    [{:from :layout :to :geom :kind :dependency}
     {:from :layout :to :metrics :kind :dependency}
@@ -359,6 +42,7 @@
     {:from :draw :to :detail :kind :dependency}
     {:from :sketch :to :draw :kind :dependency}
     {:from :sketch :to :events :kind :dependency}
+    {:from :sketch :to :detail :kind :dependency}
     {:from :core :to :sketch :kind :dependency}]}
 
   {:title "Domain"
@@ -366,92 +50,10 @@
    :packages
    [{:id :domain
      :label "Domain"
-     :crap {:mu 4.4 :max 30.1 :sigma 0.7}
-     :classes
-     [{:id :ir
-        :name "Ir"
-        :crap {:mu 5 :max 13 :sigma 3}
-        :coverage 0.803
-        :cc 71
-        :killed 23
-        :survived 0
-        :ops [
-              {:name "as-id" :private true :args ["x"] :cc 5 :crap 5 :coverage 1}
-              {:name "as-crap" :private true :args ["x"] :cc 8 :crap 8 :coverage 0.963 :killed 2 :survived 0}
-              {:name "as-coverage" :private true :args ["x"] :cc 6 :crap 6.3 :coverage 0.792 :killed 2 :survived 0}
-              {:name "as-count" :private true :args ["x"] :cc 5 :crap 5 :coverage 0.974 :killed 3 :survived 0}
-              {:name "as-cc" :private true :args ["x"] :cc 6 :crap 6.9 :coverage 0.703 :killed 4 :survived 0}
-              {:name "as-member" :private true :args ["x"] :cc 13 :crap 13 :coverage 0.973 :killed 3 :survived 0}
-              {:name "as-class" :private true :args ["c"] :cc 5 :crap 5 :coverage 0.968 :killed 1 :survived 0}
-              {:name "as-package" :private true :args ["p"] :cc 5 :crap 5 :coverage 0.933 :killed 1 :survived 0}
-              {:name "as-edge" :private true :args ["e"] :cc 4 :crap 4 :coverage 1 :killed 1 :survived 0}
-              {:name "normalize" :args ["raw"] :cc 6 :crap 7 :coverage 0.699 :killed 5 :survived 0}
-              {:name "read-diagram" :args ["s"] :cc 1 :crap 1 :coverage 1}
-              {:name "load-document" :args ["path"] :cc 4 :crap 4 :coverage 0.977 :killed 1 :survived 0}
-              {:name "load-diagram" :args ["path"] :cc 1 :crap 1 :coverage 1}
-              {:name "class-index" :args ["diagram"] :cc 1 :crap 2 :coverage 0.012}
-              {:name "package-of" :args ["diagram" "class-id"] :cc 1 :crap 1.7 :coverage 0.125}
-              ]
-        }
-      {:id :geom
-        :name "Geom"
-        :crap {:mu 4.3 :max 30.1 :sigma 6.8}
-        :coverage 0.767
-        :cc 52
-        :killed 84
-        :survived 0
-        :ops [
-              {:name "rect" :args ["x" "y" "w" "h"] :cc 1 :crap 1 :coverage 1}
-              {:name "right" :args ["r"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "bottom" :args ["r"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "cx" :args ["r"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "cy" :args ["r"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "inside?" :args ["r" "p"] :cc 2 :crap 2 :coverage 1 :killed 2 :survived 0}
-              {:name "intersect-rect" :args ["r" "outside"] :cc 6 :crap 6 :coverage 0.94 :killed 18 :survived 0}
-              {:name "segment-hits-rect?" :args ["a" "b" "r"] :cc 2 :crap 2 :coverage 1 :killed 4 :survived 0}
-              {:name "inflate" :args ["r" "pad"] :cc 1 :crap 1 :coverage 1 :killed 6 :survived 0}
-              {:name "union" :args ["rects"] :cc 2 :crap 2 :coverage 1 :killed 3 :survived 0}
-              {:name "lerp" :private true :args ["[x1" "y1"] :cc 1 :crap 1 :coverage 1 :killed 6 :survived 0}
-              {:name "overlap-param" :private true :args ["u1" "u2"] :cc 13 :crap 30.1 :coverage 0.534 :killed 26 :survived 0}
-              {:name "merge-intervals" :private true :args ["ivs"] :cc 3 :crap 5 :coverage 0.395 :killed 1 :survived 0}
-              {:name "kept-params" :private true :args ["removed"] :cc 5 :crap 7.3 :coverage 0.545 :killed 6 :survived 0}
-              {:name "near?" :private true :args ["p" "q"] :cc 1 :crap 1 :coverage 1 :killed 3 :survived 0}
-              {:name "gap-segment" :args ["a" "b" "rects" "pad"] :cc 5 :crap 5.1 :coverage 0.838 :killed 2 :survived 0}
-              {:name "gap-polyline" :args ["pts" "rects" "pad"] :cc 6 :crap 6.1 :coverage 0.851 :killed 3 :survived 0}
-              ]
-        }
-      {:id :metrics
-        :name "Metrics"
-        :crap {:mu 3.2 :max 5 :sigma 1.3}
-        :coverage 0.934
-        :cc 13
-        :killed 8
-        :survived 0
-        :ops [
-              {:name "text-w" :args ["s"] :cc 2 :crap 2 :coverage 0.9 :killed 1 :survived 0}
-              {:name "format-crap" :args ["crap"] :cc 4 :crap 4 :coverage 0.879 :killed 2 :survived 0}
-              {:name "format-coverage" :args ["p"] :cc 2 :crap 2 :coverage 1 :killed 2 :survived 0}
-              {:name "format-mutants" :args ["killed" "survived"] :cc 5 :crap 5 :coverage 0.923 :killed 3 :survived 0}
-              ]
-        }
-      {:id :theme
-        :name "Theme"
-        :crap {:mu 5 :max 5 :sigma 0}
-        :coverage 1
-        :cc 15
-        :killed 6
-        :survived 0
-        :ops [
-              {:name "risk" :private true :args ["crap"]}
-              {:name "mix" :private true :args ["a" "b" "t"]}
-              {:name "mix-rgb" :private true :args ["c1" "c2" "t"]}
-              {:name "ramp" :private true :args ["crap" "none" "green" "mid" "red"]}
-              {:name "fill-for" :args ["crap"] :cc 5 :crap 5 :coverage 1 :killed 2 :survived 0}
-              {:name "stroke-for" :args ["crap"] :cc 5 :crap 5 :coverage 1 :killed 2 :survived 0}
-              {:name "coverage-ink" :args ["p"] :cc 5 :crap 5 :coverage 1 :killed 2 :survived 0}
-              ]
-        }
-      ]}]
+     :classes [{:id :ir :name "Ir"}
+               {:id :geom :name "Geom"}
+               {:id :metrics :name "Metrics"}
+               {:id :theme :name "Theme"}]}]
    :edges []}
 
   {:title "Engine"
@@ -459,131 +61,14 @@
    :packages
    [{:id :engine
      :label "Engine"
-     :crap {:mu 3.1 :max 14 :sigma 1.5}
-     :classes
-     [{:id :layout
-        :name "Layout"
-        :crap {:mu 3.9 :max 10 :sigma 2.9}
-        :coverage 0.981
-        :cc 43
-        :killed 77
-        :survived 0
-        :ops [
-              {:name "stereotype-line" :private true :args ["c"] :cc 2 :crap 2 :coverage 1}
-              {:name "class-lines" :args ["c"] :cc 10 :crap 10 :coverage 0.976 :killed 3 :survived 0}
-              {:name "class-box-size" :args ["c"] :cc 1 :crap 1 :coverage 1 :killed 9 :survived 0}
-              {:name "inherit-edge?" :private true :args ["e"] :cc 1 :crap 1 :coverage 1}
-              {:name "bfs-ranks" :private true :args ["ids" "edges"] :cc 7 :crap 7 :coverage 1 :killed 8 :survived 0}
-              {:name "neighbors" :private true :args ["ids" "edges"] :cc 3 :crap 3 :coverage 1 :killed 1 :survived 0}
-              {:name "barycenter-order" :private true :args ["rank-ids" "pos" "nbr"] :cc 2 :crap 2 :coverage 1 :killed 2 :survived 0}
-              {:name "place-classes" :private true :args ["classes" "edges" "direction"] :cc 4 :crap 4 :coverage 1 :killed 21 :survived 0}
-              {:name "layout-package" :private true :args ["pkg" "origin-x" "origin-y" "edges" "direction" "rank-base"] :cc 3 :crap 3 :coverage 0.923 :killed 10 :survived 0}
-              {:name "package-ranks" :private true :args ["diagram"] :cc 8 :crap 8 :coverage 0.985 :killed 14 :survived 0}
-              {:name "layout" :args ["diagram"] :cc 2 :crap 2 :coverage 0.964 :killed 9 :survived 0}
-              ]
-        }
-      {:id :route
-        :name "Route"
-        :crap {:mu 3.2 :max 8 :sigma 1.8}
-        :coverage 0.909
-        :cc 124
-        :killed 171
-        :survived 0
-        :ops [
-              {:name "class-by-id" :private true :args ["scene"] :cc 1 :crap 1 :coverage 1}
-              {:name "head" :private true :args ["kind"] :cc 8 :crap 8 :coverage 0.909}
-              {:name "port-on-t" :private true :args ["r" "face" "t"] :cc 5 :crap 5 :coverage 0.912 :killed 8 :survived 0}
-              {:name "lr?" :private true :args ["scene"] :cc 1 :crap 1 :coverage 1}
-              {:name "collinear?" :private true :args ["[x1" "y1"] :cc 4 :crap 4 :coverage 1 :killed 8 :survived 0}
-              {:name "between?" :private true :args ["a" "b" "c"] :cc 3 :crap 3 :coverage 0.972 :killed 2 :survived 0}
-              {:name "collapse" :private true :args ["pts"] :cc 7 :crap 7 :coverage 0.983 :killed 4 :survived 0}
-              {:name "path-hits?" :private true :args ["pts" "from-id" "to-id" "classes"] :cc 2 :crap 2 :coverage 1 :killed 3 :survived 0}
-              {:name "try-paths" :private true :args ["candidates" "from-id" "to-id" "classes"] :cc 3 :crap 3 :coverage 0.966}
-              {:name "rank-extent" :private true :args ["classes" "rank" "lr?" "side"] :cc 5 :crap 5 :coverage 1 :killed 8 :survived 0}
-              {:name "channel" :private true :args ["classes" "from-rank" "to-rank" "lr?"] :cc 3 :crap 3 :coverage 0.973 :killed 2 :survived 0}
-              {:name "lane-coord" :private true :args ["ch" "i" "n"] :cc 1 :crap 1 :coverage 1 :killed 6 :survived 0}
-              {:name "rank-bbox" :private true :args ["classes" "rank"] :cc 1 :crap 1 :coverage 1 :killed 2 :survived 0}
-              {:name "clamp" :private true :args ["v" "lo" "hi"] :cc 1 :crap 1 :coverage 1}
-              {:name "face-span" :private true :args ["r" "face"] :cc 3 :crap 3 :coverage 0.842}
-              {:name "overlap" :private true :args ["[a0" "a1"] :cc 2 :crap 2 :coverage 1 :killed 3 :survived 0}
-              {:name "stack-faces" :private true :args ["from" "to" "lr?"] :cc 4 :crap 4 :coverage 0.894 :killed 5 :survived 0}
-              {:name "flow-faces" :private true :args ["from" "to" "lr?"] :cc 4 :crap 4 :coverage 0.894 :killed 5 :survived 0}
-              {:name "side-faces" :private true :args ["side"] :cc 5 :crap 5.2 :coverage 0.8}
-              {:name "port" :private true :args ["node" "face" "t"] :cc 1 :crap 1 :coverage 1}
-              {:name "through-channel" :private true :args ["start" "end" "ch" "i" "n" "lr?"] :cc 2 :crap 2 :coverage 1 :killed 1 :survived 0}
-              {:name "along-stack" :private true :args ["from" "to" "from-t" "to-t" "lr?"] :cc 4 :crap 5.1 :coverage 0.594 :killed 7 :survived 0}
-              {:name "pair-u" :private true :args ["from" "to" "from-t" "to-t" "side" "i"] :cc 6 :crap 6 :coverage 0.93 :killed 6 :survived 0}
-              {:name "around-bbox" :private true :args ["bb" "start" "end" "i" "lr?"] :cc 2 :crap 2 :coverage 1 :killed 6 :survived 0}
-              {:name "via-rank" :private true :args ["classes" "rank" "start" "end" "i" "lr?"] :cc 3 :crap 3.7 :coverage 0.566 :killed 8 :survived 0}
-              {:name "through-intermediates" :private true :args ["from" "to" "start" "end" "classes" "i" "lr?"] :cc 3 :crap 3 :coverage 1 :killed 7 :survived 0}
-              {:name "same-rank-candidates" :private true :args ["from" "to" "from-t" "to-t" "i" "classes" "lr?"] :cc 4 :crap 4 :coverage 0.958 :killed 3 :survived 0}
-              {:name "attach-face" :private true :args ["r" "[x" "y"] :cc 5 :crap 5 :coverage 1 :killed 7 :survived 0}
-              {:name "slide-to-cone" :private true :args ["r" "p" "other"] :cc 3 :crap 3 :coverage 0.96 :killed 14 :survived 0}
-              {:name "sync-stub" :private true :args ["pts" "which" "p" "face"] :cc 6 :crap 6 :coverage 1 :killed 16 :survived 0}
-              {:name "constrain-attach" :private true :args ["from-r" "to-r" "pts"] :cc 2 :crap 2 :coverage 0.981 :killed 6 :survived 0}
-              {:name "face-along" :private true :args ["face" "p"] :cc 2 :crap 2 :coverage 1 :killed 1 :survived 0}
-              {:name "set-face-along" :private true :args ["face" "p" "v"] :cc 2 :crap 2 :coverage 1 :killed 1 :survived 0}
-              {:name "face-limits" :private true :args ["r" "face"] :cc 3 :crap 3 :coverage 0.932 :killed 8 :survived 0}
-              {:name "spread-group" :private true :args ["r" "face" "items"] :cc 2 :crap 2 :coverage 1 :killed 7 :survived 0}
-              {:name "apply-ports" :private true :args ["edges" "placements"] :cc 1 :crap 1 :coverage 1}
-              {:name "separate-ports" :private true :args ["scene"] :cc 2 :crap 2 :coverage 1 :killed 1 :survived 0}
-              {:name "hop-candidates" :private true :args ["from" "to" "from-t" "to-t" "i" "n" "classes" "lr?"] :cc 3 :crap 3.7 :coverage 0.565 :killed 4 :survived 0}
-              {:name "port-t" :private true :args ["groups" "sort-key"] :cc 1 :crap 1 :coverage 1 :killed 2 :survived 0}
-              {:name "route" :args ["scene"] :cc 4 :crap 4 :coverage 1 :killed 10 :survived 0}
-              ]
-        }
-      {:id :curve
-        :name "Curve"
-        :crap {:mu 5.3 :max 14 :sigma 4.4}
-        :coverage 0.887
-        :cc 51
-        :killed 105
-        :survived 0
-        :ops [
-              {:name "cubic" :private true :args ["x0" "y0" "x1" "y1" "x" "y"] :cc 1 :crap 1 :coverage 1 :killed 12 :survived 0}
-              {:name "basis-path" :args ["x" "y"] :cc 14 :crap 14 :coverage 0.982 :killed 21 :survived 0}
-              {:name "end-tangent" :args ["[start" "ops"] :cc 4 :crap 4 :coverage 1 :killed 3 :survived 0}
-              {:name "face-of" :args ["r" "[x" "y"] :cc 5 :crap 5.1 :coverage 0.87 :killed 6 :survived 0}
-              {:name "clamp-to-face-cone" :private true :args ["dx" "dy" "face" "arriving?"] :cc 12 :crap 12.6 :coverage 0.837 :killed 28 :survived 0}
-              {:name "constrain-start" :private true :args ["path" "r"] :cc 5 :crap 6.2 :coverage 0.632 :killed 10 :survived 0}
-              {:name "constrain-end" :private true :args ["path" "r"] :cc 4 :crap 4 :coverage 0.977 :killed 7 :survived 0}
-              {:name "constrain-ends" :args ["path" "start-r" "end-r"] :cc 1 :crap 1 :coverage 1}
-              {:name "cubic-at" :private true :args ["[x0" "y0"] :cc 1 :crap 1 :coverage 1 :killed 15 :survived 0}
-              {:name "flatten-path" :args ["path"] :cc 4 :crap 4 :coverage 1 :killed 3 :survived 0}
-              ]
-        }
-      {:id :compose
-        :name "Compose"
-        :crap {:mu 1 :max 1 :sigma 0}
-        :coverage 1
-        :cc 5
-        :killed 7
-        :survived 0
-        :ops [
-              {:name "qid" :private true :args ["idx" "id"] :cc 1 :crap 1 :coverage 1}
-              {:name "move-rect" :private true :args ["r" "dx" "dy"] :cc 1 :crap 1 :coverage 1 :killed 2 :survived 0}
-              {:name "qualify" :private true :args ["idx" "scene"] :cc 1 :crap 1 :coverage 1}
-              {:name "translate" :private true :args ["scene" "dx" "dy"] :cc 1 :crap 1 :coverage 1 :killed 2 :survived 0}
-              {:name "compile-document" :args ["doc"] :cc 1 :crap 1 :coverage 1 :killed 3 :survived 0}
-              ]
-        }
-      {:id :hit
-        :name "Hit"
-        :crap {:mu 2 :max 4 :sigma 1.2}
-        :coverage 1
-        :cc 8
-        :killed 6
-        :survived 0
-        :ops [
-              {:name "at" :args ["x" "y"] :cc 4 :crap 4 :coverage 1 :killed 2 :survived 0}
-              {:name "class-by-id" :args ["scene" "id"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "package-by-id" :args ["scene" "id"] :cc 1 :crap 1 :coverage 1 :killed 1 :survived 0}
-              {:name "connected-edges" :args ["scene" "class-id"] :cc 2 :crap 2 :coverage 1 :killed 2 :survived 0}
-              ]
-        }
-      {:id :geom :name "Geom"}
-      {:id :metrics :name "Metrics"}
-      {:id :ir :name "Ir"}]}]
+     :classes [{:id :layout :name "Layout"}
+               {:id :route :name "Route"}
+               {:id :curve :name "Curve"}
+               {:id :compose :name "Compose"}
+               {:id :hit :name "Hit"}
+               {:id :geom :name "Geom" :hide-members true}
+               {:id :metrics :name "Metrics" :hide-members true}
+               {:id :ir :name "Ir" :hide-members true}]}]
    :edges
    [{:from :layout :to :geom :kind :dependency}
     {:from :layout :to :metrics :kind :dependency}
@@ -599,62 +84,14 @@
    :packages
    [{:id :app
      :label "Application"
-     :crap {:mu 8.5 :max 134.6 :sigma 5.7}
-     :classes
-     [{:id :events
-        :name "Events"
-        :crap {:mu 2.8 :max 9 :sigma 2.6}
-        :coverage 0.973
-        :cc 36
-        :killed 26
-        :survived 0
-        :ops [
-              {:name "compile-diagram" :args ["diagram"] :cc 1 :crap 1 :coverage 1}
-              {:name "compile-document" :args ["doc"] :cc 1 :crap 1 :coverage 1}
-              {:name "load-path" :args ["path"] :cc 1 :crap 1 :coverage 1}
-              {:name "drop-missing-detail" :private true :args ["state"] :cc 3 :crap 3 :coverage 1}
-              {:name "maybe-reload" :args ["state"] :cc 4 :crap 4 :coverage 0.978 :killed 2 :survived 0}
-              {:name "select-class" :args ["state" "id"] :cc 2 :crap 2 :coverage 0.95 :killed 1 :survived 0}
-              {:name "close-detail" :args ["state"] :cc 1 :crap 1.5 :coverage 0.2}
-              {:name "on-detail-press" :args ["state" "model" "scroll" "y"] :cc 2 :crap 2 :coverage 0.947 :killed 1 :survived 0}
-              {:name "world-xy" :args ["state" "x" "y"] :cc 1 :crap 1 :coverage 1 :killed 2 :survived 0}
-              {:name "on-move" :args ["state" "x" "y"] :cc 1 :crap 1 :coverage 1}
-              {:name "on-press" :args ["state" "x" "y"] :cc 2 :crap 2 :coverage 1 :killed 2 :survived 0}
-              {:name "on-scroll" :args ["state" "amount" "opts"] :cc 9 :crap 9 :coverage 0.973 :killed 15 :survived 0}
-              {:name "on-key" :args ["state" "k"] :cc 8 :crap 8 :coverage 1 :killed 3 :survived 0}
-              ]
-        }
-      {:id :detail
-        :name "Detail"
-        :crap {:mu 14.2 :max 134.6 :sigma 34.9}
-        :coverage 0.848
-        :cc 65
-        :killed 22
-        :survived 0
-        :ops [
-              {:name "rel-phrase" :private true :args ["kind" "outgoing?"] :cc 21 :crap 134.6 :coverage 0.364}
-              {:name "model" :args ["scene" "id"] :cc 4 :crap 4 :coverage 0.929 :killed 2 :survived 0}
-              {:name "column-layout" :cc 3 :crap 3 :coverage 1 :killed 4 :survived 0}
-              {:name "crap-mu" :private true :args ["crap"] :cc 5 :crap 5 :coverage 0.885}
-              {:name "sum-key" :private true :args ["xs" "k"] :cc 3 :crap 3 :coverage 0.966 :killed 3 :survived 0}
-              {:name "format-num" :private true :args ["n"]}
-              {:name "format-cells" :private true :args ["[crap-mu" "cc" "coverage" "killed" "survived" "class-row?"] :cc 5 :crap 5 :coverage 1 :killed 3 :survived 0}
-              {:name "class-metrics" :private true :args ["c"] :cc 4 :crap 4 :coverage 0.94}
-              {:name "op-metrics" :private true :args ["op"]}
-              {:name "emit" :private true :args ["acc" "kind" "text" "extra"] :cc 2 :crap 2 :coverage 0.969 :killed 1 :survived 0}
-              {:name "heading" :private true :args ["acc" "label"] :cc 1 :crap 1 :coverage 1}
-              {:name "emit-table" :private true :args ["acc" "c"] :cc 1 :crap 1 :coverage 1}
-              {:name "rows" :args ["model"] :cc 11 :crap 13.6 :coverage 0.723 :killed 5 :survived 0}
-              {:name "content-h" :args ["rows"] :cc 2 :crap 5.5 :coverage 0.048}
-              {:name "rel-at" :args ["rows" "y"] :cc 3 :crap 3 :coverage 1 :killed 4 :survived 0}
-              ]
-        }
-      {:id :compose :name "Compose"}
-      {:id :ir :name "Ir"}
-      {:id :hit :name "Hit"}
-      {:id :layout :name "Layout"}
-      {:id :route :name "Route"}
-      {:id :metrics :name "Metrics"}]}]
+     :classes [{:id :events :name "Events"}
+               {:id :detail :name "Detail"}
+               {:id :compose :name "Compose" :hide-members true}
+               {:id :ir :name "Ir" :hide-members true}
+               {:id :hit :name "Hit" :hide-members true}
+               {:id :layout :name "Layout" :hide-members true}
+               {:id :route :name "Route" :hide-members true}
+               {:id :metrics :name "Metrics" :hide-members true}]}]
    :edges
    [{:from :events :to :compose :kind :association}
     {:from :events :to :ir :kind :dependency}
@@ -670,67 +107,14 @@
    :packages
    [{:id :adapters
      :label "Adapters"
-     :crap {:mu 20.6 :max 178.2 :sigma 14.8}
-     :classes
-     [{:id :draw
-        :name "Draw"
-        :crap {:mu 40.6 :max 178.2 :sigma 46.4}
-        :coverage 0.01
-        :cc 75
-        :ops [
-              {:name "rgb" :private true :args ["c"] :cc 1 :crap 1.8 :coverage 0.071}
-              {:name "stroke-rgb" :private true :args ["c"] :cc 1 :crap 1.8 :coverage 0.083}
-              {:name "arrowhead" :private true :args ["kind" "[x" "y"] :cc 5 :crap 29.5 :coverage 0.007}
-              {:name "draw-polyline" :private true :args ["pts"] :cc 1 :crap 1.9 :coverage 0.021}
-              {:name "obstacle-rects" :private true :args ["scene" "e"] :cc 2 :crap 5.6 :coverage 0.032}
-              {:name "draw-edge" :private true :args ["e" "selected?" "scene"] :cc 5 :crap 29.4 :coverage 0.009}
-              {:name "draw-package" :private true :args ["p" "selected?"] :cc 3 :crap 11.6 :coverage 0.015}
-              {:name "draw-class" :private true :args ["c" "selected?" "hovered?"] :cc 13 :crap 178.2 :coverage 0.008}
-              {:name "draw-sidebar" :private true :args ["state"] :cc 9 :crap 89.1 :coverage 0.004}
-              {:name "draw-state" :args ["state"] :cc 7 :crap 55.6 :coverage 0.003}
-              {:name "detail-row-color" :private true :args ["row"] :cc 7 :crap 44.7 :coverage 0.083}
-              {:name "cell-color" :private true :args ["row" "col"] :cc 9 :crap 83.4 :coverage 0.028}
-              {:name "draw-detail-cells" :private true :args ["row" "y"] :cc 4 :crap 19.6 :coverage 0.008}
-              {:name "draw-detail-row" :private true :args ["row"] :cc 7 :crap 54.4 :coverage 0.011}
-              {:name "draw-detail" :args ["model" "scroll"] :cc 1 :crap 1.9 :coverage 0.019}
-              ]
-        }
-      {:id :sketch
-        :name "Sketch"
-        :crap {:mu 15.9 :max 41.1 :sigma 12.9}
-        :coverage 0.063
-        :cc 36
-        :killed 2
-        :survived 0
-        :ops [
-              {:name "live?" :private true :args ["applet"] :cc 3 :crap 9.9 :coverage 0.083}
-              {:name "raise-applet!" :private true :args ["applet"]}
-              {:name "close-detail-window!" :private true :cc 3 :crap 11.2 :coverage 0.03}
-              {:name "take-flag!" :private true :args ["k"] :cc 2 :crap 5.4 :coverage 0.053}
-              {:name "detail-setup" :private true :cc 1 :crap 1.9 :coverage 0.048}
-              {:name "detail-update" :private true :args ["state"] :cc 2 :crap 5.6 :coverage 0.038}
-              {:name "detail-scroll" :private true :args ["state" "amount"] :cc 5 :crap 28.5 :coverage 0.02}
-              {:name "start-detail-window!" :private true :cc 5 :crap 29.4 :coverage 0.008}
-              {:name "ensure-detail-window!" :private true :args ["model"] :cc 3 :crap 11.4 :coverage 0.023}
-              {:name "setup" :args ["path"] :cc 1 :crap 1.9 :coverage 0.053}
-              {:name "update-state" :args ["state"] :cc 5 :crap 28.7 :coverage 0.018}
-              {:name "start!" :args ["path"] :cc 6 :crap 41.1 :coverage 0.008}
-              ]
-        }
-      {:id :core
-        :name "Core"
-        :crap {:mu 5.4 :max 5.4 :sigma 0}
-        :coverage 0.095
-        :cc 2
-        :ops [
-              {:name "-main" :args ["args"] :cc 2 :crap 5.4 :coverage 0.05}
-              ]
-        }
-      {:id :events :name "Events"}
-      {:id :curve :name "Curve"}
-      {:id :theme :name "Theme"}
-      {:id :hit :name "Hit"}
-      {:id :detail :name "Detail"}]}]
+     :classes [{:id :draw :name "Draw"}
+               {:id :sketch :name "Sketch"}
+               {:id :core :name "Core"}
+               {:id :events :name "Events" :hide-members true}
+               {:id :curve :name "Curve" :hide-members true}
+               {:id :theme :name "Theme" :hide-members true}
+               {:id :hit :name "Hit" :hide-members true}
+               {:id :detail :name "Detail" :hide-members true}]}]
    :edges
    [{:from :core :to :sketch :kind :association}
     {:from :sketch :to :draw :kind :dependency}

@@ -25,6 +25,11 @@ clj -M:crap
 clj -M:mutate src/uml_viewer/layout.clj
 ```
 
+`clj -M:crap` writes `.metrics/crap.edn`. `clj -M:mutate` writes
+`.metrics/mutate/<ns>.edn` and reuses it for differential runs. The viewer
+overlays those snapshots onto the diagram at load. Rename or move of a
+function is a new form: metrics are recomputed, not matched.
+
 ## IR
 
 The file is EDN. A document may contain several diagrams (one per layer),

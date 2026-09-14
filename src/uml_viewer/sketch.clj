@@ -5,7 +5,9 @@
             [uml-viewer.detail :as detail]
             [uml-viewer.draw :as draw]
             [uml-viewer.events :as events])
-  (:import [processing.event MouseEvent]))
+  (:import [java.awt Frame]
+           [javax.swing SwingUtilities]
+           [processing.event MouseEvent]))
 
 (def window-width 1500)
 (def window-height 920)
@@ -20,18 +22,34 @@
            (not (.-finished applet))
            (catch Exception _ false)))))
 
-(defn- raise-applet! [applet]
-  (when applet
+(defn- native-window [applet]
+  (try
+    (.getNative (.getSurface applet))
+    (catch Exception _ nil)))
+
+(defn- front! [native]
+  (cond
+    (instance? Frame native)
+    (doto ^Frame native
+      (.setExtendedState Frame/NORMAL)
+      (.setVisible true)
+      (.toFront)
+      (.requestFocus)
+      (.requestFocusInWindow))
+    (instance? java.awt.Window native)
+    (doto ^java.awt.Window native
+      (.setVisible true)
+      (.toFront)
+      (.requestFocus)
+      (.requestFocusInWindow))))
+
+(defn- pin-card! [on?]
+  (when-let [ap (:applet @!bridge)]
     (try
-      (let [surface (.getSurface applet)]
-        (.setAlwaysOnTop surface true)
-        (.setAlwaysOnTop surface false)
-        (when-let [native (try (.getNative surface) (catch Exception _ nil))]
-          (when (instance? java.awt.Window native)
-            (doto ^java.awt.Window native
-              (.setVisible true)
-              (.toFront)
-              (.requestFocus)))))
+      (when-let [surface (.getSurface ap)]
+        (.setAlwaysOnTop surface (boolean on?)))
+      (when on?
+        (front! (native-window ap)))
       (catch Exception _))))
 
 (defn- close-detail-window! []
@@ -105,16 +123,15 @@
 
 (defn- ensure-detail-window! [model]
   (swap! !bridge assoc :model model)
-  (if (live? (:applet @!bridge))
-    (raise-applet! (:applet @!bridge))
-    (when-not (:starting @!bridge)
-      (swap! !bridge assoc :starting true)
-      (javax.swing.SwingUtilities/invokeLater
-        (fn []
-          (try
-            (start-detail-window!)
-            (finally
-              (swap! !bridge assoc :starting false))))))))
+  (when-not (or (live? (:applet @!bridge)) (:starting @!bridge))
+    (swap! !bridge assoc :starting true)
+    (SwingUtilities/invokeLater
+      (fn []
+        (try
+          (start-detail-window!)
+          (pin-card! true)
+          (finally
+            (swap! !bridge assoc :starting false)))))))
 
 (defn setup [path]
   (q/frame-rate 30)
@@ -145,10 +162,14 @@
     :update update-state
     :draw draw/draw-state
     :mouse-pressed (fn [state event]
-                     (let [state (events/on-press state (:x event) (:y event))]
-                       (when-let [id (:detail-id state)]
-                         (when-let [model (detail/model (:scene state) id)]
-                           (ensure-detail-window! model)))
+                     (let [state (events/on-press state (:x event) (:y event))
+                           class? (= :class (:kind (:selected state)))]
+                       (if class?
+                         (do
+                           (when-let [model (detail/model (:scene state) (:detail-id state))]
+                             (ensure-detail-window! model))
+                           (pin-card! true))
+                         (pin-card! false))
                        state))
     :mouse-moved (fn [state event]
                    (events/on-move state (:x event) (:y event)))
