@@ -4,8 +4,9 @@
   (scan [this root opts]
     "Project graph of classes and edges from source under `root`.
      `opts` is a map; `:prefix` is the project namespace prefix.
-     Returns `{:classes [{:id :name :ns :stereotype}]
-               :edges [{:from :to :kind}]}`."))
+     Returns `{:classes [{:id :name :ns :stereotype :foreign}]
+               :edges [{:from :to :kind}]}`.
+     External requires are classes with `:foreign true`."))
 
 (defonce ^:private languages (atom {}))
 

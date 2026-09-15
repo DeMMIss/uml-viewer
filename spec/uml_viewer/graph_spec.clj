@@ -39,14 +39,30 @@
       (let [g (graph/scan (graph/lookup :clojure) dir {:prefix "demo"})
             by-id (into {} (map (juxt :id identity) (:classes g)))
             edges (set (map (juxt :from :to :kind) (:edges g)))]
-        (should= #{:a :b :c} (set (keys by-id)))
+        (should= #{:a :b :c :clojure.string} (set (keys by-id)))
         (should= "A" (get-in by-id [:a :name]))
         (should= :interface (:stereotype (by-id :b)))
         (should-be-nil (:stereotype (by-id :a)))
         (should (contains? edges [:a :b :dependency]))
         (should (contains? edges [:a :c :dependency]))
         (should (contains? edges [:a :b :implements]))
-        (should-not (some #(= "clojure.string" (str (:to %))) (:edges g))))))
+        (should (:foreign (by-id :clojure.string)))
+        (should (contains? edges [:a :clojure.string :dependency])))))
+
+  (it "treats Java imports as foreign packages"
+    (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                       (str "uml-graph-imp-" (System/nanoTime)))]
+      (spit-ns dir "demo/a.clj"
+               "(ns demo.a
+                  (:import [javax.swing JFrame]
+                           java.io.File))")
+      (let [g (graph/scan (graph/lookup :clojure) dir {:prefix "demo"})
+            ids (set (map :id (:classes g)))
+            edges (set (map (juxt :from :to) (:edges g)))]
+        (should (contains? ids :javax.swing))
+        (should (contains? ids :java.io))
+        (should (contains? edges [:a :javax.swing]))
+        (should (contains? edges [:a :java.io])))))
 
   (it "names nested namespaces like source.clojure"
     (let [dir (io/file (System/getProperty "java.io.tmpdir")
@@ -65,8 +81,6 @@
       (should= :interface (:stereotype (by-id :source)))
       (should= "SourceClojure" (:name (by-id :source.clojure)))
       (should (contains? edges [:source.clojure :source :implements]))
-      (should (contains? edges [:events :compose :dependency]))
-      (should-not (some (fn [e]
-                          (or (= :quil.core (:to e))
-                              (= :clojure.string (:to e))))
-                        (:edges g))))))
+      (should (contains? edges [:document :compose :dependency]))
+      (should (:foreign (by-id :quil.core)))
+      (should (contains? edges [:draw :quil.core :dependency])))))

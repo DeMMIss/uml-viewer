@@ -57,6 +57,20 @@
        (mapcat rest)
        (mapcat expand-libspec)))
 
+(defn- import-packages [ns-form]
+  (->> (ns-clauses ns-form)
+       (filter #(= :import (first %)))
+       (mapcat rest)
+       (keep (fn [spec]
+               (cond
+                 (symbol? spec)
+                 (let [s (str spec)
+                       i (str/last-index-of s ".")]
+                   (when i (subs s 0 i)))
+                 (and (vector? spec) (symbol? (first spec)))
+                 (str (first spec))
+                 :else nil)))))
+
 (defn- project-ns? [sym prefix]
   (let [s (str sym)
         p (str prefix)]
@@ -115,6 +129,11 @@
                         (map #(class-id (str %) prefix))
                         (remove #(= % id))
                         vec)
+         :foreign-requires (->> (concat (map (comp str :lib) specs)
+                                        (import-packages ns-form))
+                                (remove #(project-ns? (symbol %) prefix))
+                                distinct
+                                vec)
          :implements (->> (protocol-nses forms aliases ns-str)
                           (filter #(project-ns? (symbol %) prefix))
                           (map #(class-id % prefix))
@@ -124,14 +143,27 @@
 (defn- as-edges [c]
   (concat
     (map (fn [to] {:from (:id c) :to to :kind :dependency}) (:requires c))
+    (map (fn [to] {:from (:id c) :to (keyword to) :kind :dependency})
+         (:foreign-requires c))
     (map (fn [to] {:from (:id c) :to to :kind :implements}) (:implements c))))
+
+(defn- foreign-class [ns-str]
+  {:id (keyword ns-str)
+   :name ns-str
+   :ns ns-str
+   :foreign true})
 
 (defrecord ClojureGraph []
   graph/LanguageGraph
   (scan [_ root opts]
     (let [prefix (or (:prefix opts) "uml-viewer")
           parsed (keep #(parse-file % prefix) (source-files root))
-          classes (mapv #(dissoc % :requires :implements) parsed)
+          project (mapv #(dissoc % :requires :implements :foreign-requires) parsed)
+          foreigns (->> parsed
+                        (mapcat :foreign-requires)
+                        distinct
+                        (mapv foreign-class))
+          classes (into project foreigns)
           edges (vec (mapcat as-edges parsed))]
       {:classes classes :edges edges})))
 

@@ -26,6 +26,18 @@
     (should-throw
       (ir/normalize (assoc tiny :edges [{:from :a :to :nope}]))))
 
+  (it "keeps top-level foreign ovals and allows edges to them"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :a :name "A"}]}]
+               :foreign [{:id :quil :name "quil" :shape :oval}]
+               :edges [{:from :a :to :quil :kind :dependency}]})]
+      (should= :oval (get-in d [:foreign 0 :shape]))
+      (should= :quil (get-in d [:foreign 0 :id]))
+      (should= :p (:package (get (ir/class-index d) :a)))
+      (should-be-nil (:package (get (ir/class-index d) :quil)))))
+
   (it "rejects duplicate class ids"
     (should-throw
       (ir/normalize (assoc-in tiny [:packages 0 :classes 1 :id] :a))))

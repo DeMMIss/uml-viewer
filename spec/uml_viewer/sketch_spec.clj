@@ -4,9 +4,10 @@
             [speclj.core :refer :all]
             [uml-viewer.detail :as detail]
             [uml-viewer.draw :as draw]
+            [uml-viewer.compose :as compose]
+            [uml-viewer.document :as document]
             [uml-viewer.events :as events]
             [uml-viewer.geom :as geom]
-            [uml-viewer.grok :as grok]
             [uml-viewer.ir :as ir]
             [uml-viewer.sketch :as sketch]
             [uml-viewer.source-window :as source-window])
@@ -54,7 +55,7 @@
   (isShiftDown [_] on?))
 
 (defn- scene []
-  (events/compile-diagram
+  (compose/compile-diagram
     (ir/normalize
       {:packages
        [{:id :p :label "P"
@@ -148,6 +149,20 @@
                                         (getSurface [_] (throw (Exception. "gone"))))})
       (call 'pin-card! true)))
 
+  (it "titles the class card with the class name"
+    (should= "Layout" (call 'class-title {:class {:name "Layout"}}))
+    (should= "Class" (call 'class-title nil))
+    (let [titles (atom [])
+          frame (proxy [Frame] []
+                  (setTitle [t] (swap! titles conj t)))]
+      (try
+        (reset! sketch/!bridge
+                {:applet (->FakeApplet false (->FakeSurface frame (atom nil)))})
+        (call 'set-card-title! "Draw")
+        (should= ["Draw"] @titles)
+        (finally
+          (.dispose frame)))))
+
   (it "closes the detail applet and swallows exit errors"
     (let [exited (atom false)]
       (call 'close-detail-window!)
@@ -175,7 +190,7 @@
 
   (it "shuts down grok children then halts the VM"
     (let [order (atom [])]
-      (with-redefs [grok/shutdown-children! (fn [] (swap! order conj :grok))
+      (with-redefs [uml-viewer.sketch/shutdown-children! (fn [] (swap! order conj :grok))
                     uml-viewer.sketch/halt-vm! (fn [] (swap! order conj :halt))]
         (call 'exit-app!)
         (should= [:grok :halt] @order))))
@@ -278,6 +293,8 @@
 
   (it "starts a detail sketch and stores the applet"
     (let [opts (atom nil)]
+      (reset! sketch/!bridge (assoc (empty-bridge)
+                               :model {:class {:name "Layout"}}))
       (with-redefs [q/sketch (fn [& args]
                                (reset! opts (apply hash-map args))
                                :detail-applet)]
@@ -285,7 +302,7 @@
         (should= :detail-applet (:applet @sketch/!bridge))
         (should-not (:closed? @sketch/!bridge))
         (should-not (:exiting @sketch/!bridge))
-        (should= "Class" (:title @opts))
+        (should= "Layout" (:title @opts))
         (should= [detail/width detail/height] (:size @opts))
         (quiet-quil
           (fn []
@@ -298,10 +315,10 @@
       (with-redefs [uml-viewer.sketch/later! (fn [f] (f))
                     uml-viewer.sketch/start-detail-window! (fn [] (swap! started inc))
                     uml-viewer.sketch/pin-card! (fn [on?] (swap! pinned conj on?))]
-        (call 'ensure-detail-window! {:class {:id :a}})
+        (call 'ensure-detail-window! {:class {:id :a :name "A"}})
         (should= 1 @started)
         (should= [true] @pinned)
-        (should= {:id :a} (get-in @sketch/!bridge [:model :class]))
+        (should= {:id :a :name "A"} (get-in @sketch/!bridge [:model :class]))
         (should-not (:starting @sketch/!bridge))
         (reset! sketch/!bridge (assoc @sketch/!bridge :applet (->Finished false)))
         (call 'ensure-detail-window! {:class {:id :b}})
@@ -319,13 +336,13 @@
   (it "loads a path after configuring the main sketch"
     (quiet-quil
       (fn []
-        (with-redefs [events/load-path (fn [p] {:path p})]
+        (with-redefs [document/load-path (fn [p] {:path p})]
           (should= {:path "doc.edn"} (sketch/setup "doc.edn"))))))
 
   (it "applies closed and pick flags and keeps the detail model in sync"
     (let [s (assoc (state) :detail-id :a)
           closed (atom false)]
-      (with-redefs [events/maybe-reload identity
+      (with-redefs [document/maybe-reload identity
                     uml-viewer.sketch/close-detail-window! (fn [] (reset! closed true))]
         (reset! sketch/!bridge (assoc (empty-bridge) :closed? true))
         (let [next (sketch/update-state s)]
@@ -423,13 +440,14 @@
           keyed (atom nil)]
       (with-redefs [q/sketch (fn [& args]
                                (reset! opts (apply hash-map args))
-                               :main-applet)]
+                               :main-applet)
+                    uml-viewer.sketch/open-in-terminal! (fn [])]
         (should= :main-applet (sketch/start! "doc.edn" :source-impl))
         (should= "UML viewer" (:title @opts))
         (should= [sketch/window-width sketch/window-height] (:size @opts))
         (quiet-quil
           (fn []
-            (with-redefs [events/load-path (fn [p] {:path p})
+            (with-redefs [document/load-path (fn [p] {:path p})
                           events/on-move (fn [state x y]
                                            (reset! moved [state x y])
                                            state)
@@ -442,6 +460,55 @@
               ((:mouse-moved @opts) :s {:x 4 :y 5})
               (should= [:s 4 5] @moved)
               ((:key-pressed @opts) :s {:key :r})
-              (should= [:s :r {:window-w 1500 :window-h 920}] @keyed)
+              (should= [:s :r {:window-w 1500 :window-h 920 :view-w 1220}] @keyed)
               (should= :s ((:on-close @opts) :s))))))))
+
+(describe "grok session"
+  (it "names a tmux session and attaches Terminal to it"
+    (let [args (sketch/new-session-args "/tmp/proj")
+          script (sketch/osascript (sketch/attach-command))
+          [br bg bb] (sketch/rgb-16 draw/bg)
+          [gr gg gb] (sketch/rgb-16 draw/gold)]
+      (should= "uml-viewer-grok" sketch/session-name)
+      (should= ["kill-session" "-t" "uml-viewer-grok"] (sketch/kill-session-args))
+      (should (some #{"new-session"} args))
+      (should (some #{"--yolo"} args))
+      (should (some #{"--rules"} args))
+      (should (some #{sketch/standing-rules} args))
+      (should (some #{"GROK_THEME=terminal"} args))
+      (should (some #{"status"} args))
+      (should (re-find #"tmux attach -t uml-viewer-grok" (sketch/attach-command)))
+      (should (re-find #"tell application \"Terminal\"" script))
+      (should-not (re-find #"activate" script))
+      (should (re-find #"^tell application \"Terminal\"\nlaunch" script))
+      (should (re-find #"AXRaise" script))
+      (should (re-find #"custom title of grokTab to \"Grok\"" script))
+      (should (re-find #"return winID" script))
+      (should (re-find (re-pattern (str "background color of grokTab to \\{" br ", " bg ", " bb "\\}"))
+                       script))
+      (should (re-find (re-pattern (str "cursor color of grokTab to \\{" gr ", " gg ", " gb "\\}"))
+                       script))))
+
+  (it "closes the Grok Terminal window by id and title"
+    (let [script (sketch/close-terminal-script "42")]
+      (should (re-find #"exists process \"Terminal\"" script))
+      (should (re-find #"whose id is 42" script))
+      (should (re-find #"custom title of selected tab of w is \"Grok\"" script))
+      (should (re-find #"close w saving no" script))))
+
+  (it "scales theme RGB into Terminal's 16-bit colors"
+    (should= [5654 7196 8224] (sketch/rgb-16 [22 28 32]))
+    (should= [0 65535 257] (sketch/rgb-16 [0 255 1])))
+
+  (it "kills the tmux session and closes Terminal on shutdown"
+    (let [tmux-args (atom nil)
+          scripts (atom [])]
+      (reset! sketch/!terminal-window-id "99")
+      (with-redefs [uml-viewer.sketch/tmux! (fn [& args] (reset! tmux-args args) 0)
+                    uml-viewer.sketch/run-osascript (fn [s] (swap! scripts conj s) "")]
+        (sketch/shutdown-children!)
+        (should= ["kill-session" "-t" "uml-viewer-grok"] @tmux-args)
+        (should= 1 (count @scripts))
+        (should (re-find #"whose id is 99" (first @scripts)))
+        (should-be-nil @sketch/!terminal-window-id)))))
 )

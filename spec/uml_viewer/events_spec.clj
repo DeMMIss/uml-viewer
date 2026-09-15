@@ -1,13 +1,13 @@
 (ns uml-viewer.events-spec
   (:require [speclj.core :refer :all]
+            [uml-viewer.compose :as compose]
             [uml-viewer.detail :as detail]
             [uml-viewer.events :as events]
             [uml-viewer.geom :as geom]
-            [uml-viewer.ir :as ir]
-            [uml-viewer.metrics :as m]))
+            [uml-viewer.ir :as ir]))
 
 (defn scene []
-  (events/compile-diagram
+  (compose/compile-diagram
     (ir/normalize
       {:packages
        [{:id :p :label "P"
@@ -50,8 +50,9 @@
 
   (it "pans far enough to slide content out from under the inspector"
     (let [s (assoc (state) :scene {:size {:h 800 :w 1400}})
-          next (events/on-scroll s 100 {:horizontal? true :window-w 1500 :window-h 800})
-          view-w (- 1500 m/sidebar-w)]
+          view-w 1220
+          next (events/on-scroll s 100 {:horizontal? true :window-w 1500
+                                       :window-h 800 :view-w view-w})]
       (should= (- 1400 view-w) (:cam-x next))))
 
   (it "reloads on r by clearing mtime"
@@ -77,39 +78,6 @@
           [x y] [(geom/cx (:rect a)) (geom/cy (:rect a))]]
       (should= {:kind :class :id :a} (:hover (events/on-move s x y)))))
 
-  (it "loads a document from disk"
-    (let [s (events/load-path "examples/library.edn")]
-      (should (seq (:classes (:scene s))))
-      (should (pos? (:mtime s)))))
-
-  (it "does not throw on a missing file"
-    (let [s (events/load-path "no-such-diagram.edn")]
-      (should (re-find #"not found" (:error s)))
-      (should= [] (get-in s [:scene :classes]))))
-
-  (it "does not throw on invalid EDN"
-    (let [f (java.io.File/createTempFile "bad" ".edn")]
-      (spit f "{:packages")
-      (let [s (events/load-path (.getPath f))]
-        (should (string? (:error s)))
-        (should= [] (get-in s [:scene :classes])))))
-
-  (it "reloads when the file mtime changes"
-    (let [s (assoc (events/load-path "examples/library.edn") :mtime 0)
-          next (events/maybe-reload s)]
-      (should (pos? (:mtime next)))
-      (should-not (:error next))))
-
-  (it "leaves state alone when mtime is unchanged"
-    (let [s (events/load-path "examples/library.edn")]
-      (should= s (events/maybe-reload s))))
-
-  (it "records an error when reloaded IR is invalid"
-    (let [f (java.io.File/createTempFile "bad" ".edn")]
-      (spit f "{:packages [{:classes [{}]}]}")
-      (let [next (events/maybe-reload (assoc (state) :path (.getPath f) :mtime 0))]
-        (should (string? (:error next))))))
-
   (it "reads wheel amount from a map and ignores junk"
     (let [s (assoc (state) :scene {:size {:h 4000 :w 800}})]
       (should= 96 (:cam-y (events/on-scroll s {:count 2} 900)))
@@ -122,26 +90,4 @@
           rel (first (filter #(= :rel (:kind %)) (detail/rows model)))
           next (events/on-detail-press s model 0 (:y rel))]
       (should= :b (:detail-id next))
-      (should= {:kind :class :id :b} (:selected next))))
-
-  (it "drops a detail id whose class vanished on reload"
-    (let [f (java.io.File/createTempFile "uml" ".edn")]
-      (spit f "{:packages [{:id :p :label \"P\" :classes [{:id :a :name \"A\"} {:id :b :name \"B\"}]}] :edges []}")
-      (let [s (events/load-path (.getPath f))
-            gone (first (filter #(= "B" (:name %)) (:classes (:scene s))))
-            kept-name "A"]
-        (spit f "{:packages [{:id :p :label \"P\" :classes [{:id :a :name \"A\"}]}] :edges []}")
-        (let [next (events/maybe-reload (assoc s :mtime 0 :detail-id (:id gone)))]
-          (should-not (:detail-id next))
-          (should (some #(= kept-name (:name %)) (:classes (:scene next)))))))))
-
-(describe "document"
-  (it "stacks diagrams top to bottom"
-    (let [d {:packages [{:id :p :label "P" :classes [{:id :a :name "A"}]}] :edges []}
-          doc {:title "Doc"
-               :diagrams [(assoc (ir/normalize d) :title "One")
-                          (assoc (ir/normalize d) :title "Two")]}
-          scene (events/compile-document doc)
-          titles (map :title (:sections scene))]
-      (should= ["One" "Two"] titles)
-      (should (apply < (map :title-y (:sections scene)))))))
+      (should= {:kind :class :id :b} (:selected next)))))

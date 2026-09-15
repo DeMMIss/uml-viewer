@@ -1,15 +1,14 @@
 (ns uml-viewer.detail-spec
   (:require [speclj.core :refer :all]
             [uml-viewer.detail :as detail]
-            [uml-viewer.events :as events]
-            [uml-viewer.ir :as ir]
-            [uml-viewer.metrics :as m]))
+            [uml-viewer.compose :as compose]
+            [uml-viewer.ir :as ir]))
 
 (defn- call [sym & args]
   (apply (ns-resolve 'uml-viewer.detail sym) args))
 
 (defn scene []
-  (events/compile-diagram
+  (compose/compile-diagram
     (ir/normalize
       {:title "Tiny"
        :packages
@@ -44,12 +43,6 @@
     (should= "from" (call 'rel-phrase :other false))))
 
 (describe "detail"
-  (it "formats coverage and mutant counts"
-    (should= "90%" (m/format-coverage 0.9))
-    (should-be-nil (m/format-coverage nil))
-    (should= "3 killed / 1 survived" (m/format-mutants 3 1))
-    (should-be-nil (m/format-mutants nil nil)))
-
   (it "builds a class card with coverage, ops, and relationships"
     (let [s (scene)
           model (detail/model s :a)
@@ -83,7 +76,7 @@
       (should= "hide" (detail/member-at rows (+ (:y hide) 1)))))
 
   (it "shows class CRAP as μ, omits CC, and keeps μ/max/σ on the header line"
-    (let [s (events/compile-diagram
+    (let [s (compose/compile-diagram
               (ir/normalize
                 {:packages
                  [{:id :p :label "P"

@@ -1,6 +1,6 @@
 (ns uml-viewer.detail
   (:require [uml-viewer.hit :as hit]
-            [uml-viewer.metrics :as m]
+            [uml-viewer.layout :as layout]
             [uml-viewer.overlay :as overlay]))
 
 (def width 640)
@@ -80,7 +80,7 @@
                (format-num crap-mu)))
    :crap-n crap-mu
    :cc-s (when (and cc (not class-row?)) (str (long cc)))
-   :cov-s (m/format-coverage coverage)
+   :cov-s (layout/format-coverage coverage)
    :coverage coverage
    :killed-s (when killed (str (long killed)))
    :survived-s (when survived (str (long survived)))
@@ -104,7 +104,7 @@
 
 (defn- emit [acc kind text extra]
   (let [{:keys [rows y]} acc
-        h (or (:h extra) m/line-h)]
+        h (or (:h extra) layout/line-h)]
     {:rows (conj rows (merge {:kind kind :text text :y y :h h} extra))
      :y (+ y h)}))
 
@@ -143,7 +143,7 @@
           acc (if-let [t (:title model)]
                 (emit acc :muted t {})
                 acc)
-          acc (if-let [s (m/format-crap (:crap c))]
+          acc (if-let [s (layout/format-crap (:crap c))]
                 (emit acc :crap s {})
                 acc)
           acc (if (or (seq (:ops c))

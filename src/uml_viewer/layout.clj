@@ -1,13 +1,46 @@
 (ns uml-viewer.layout
-  (:require [uml-viewer.geom :as geom]
-            [uml-viewer.metrics :as m]))
+  (:require [uml-viewer.geom :as geom]))
+
+(def char-w 8)
+(def line-h 18)
+(def pad 12)
+(def banner-h 32)
+(def class-gap 40)
+(def pack-gap 40)
+(def rank-gap 80)
+(def class-rank-gap 140)
+(def margin 40)
+(def head-size 16)
+(def lane-gap 10)
+(def sidebar-w 280)
+(def under-gap 5)
+
+(defn text-w [s]
+  (* char-w (count (or s ""))))
+
+(defn format-crap [crap]
+  (when (:mu crap)
+    (format "μ %.1f   max %.1f   σ %.1f"
+            (double (:mu crap))
+            (double (or (:max crap) (:mu crap)))
+            (double (or (:sigma crap) 0)))))
+
+(defn format-coverage [p]
+  (when p
+    (format "%.0f%%" (* 100.0 p))))
+
+(defn format-mutants [killed survived]
+  (when (or killed survived)
+    (format "%d killed / %d survived"
+            (long (or killed 0))
+            (long (or survived 0)))))
 
 (defn- stereotype-line [c]
   (when-let [st (:stereotype c)]
     (str "«" (name st) "»")))
 
 (defn class-lines [c]
-  (let [crap (m/format-crap (:crap c))
+  (let [crap (format-crap (:crap c))
         fields (when-not (:hide-members c)
                  (mapv :text (or (:fields c) [])))
         ops (when-not (:hide-members c)
@@ -24,13 +57,13 @@
 (defn class-box-size [c]
   (let [lines (class-lines c)
         texts (keep :text lines)
-        content-w (apply max 0 (map m/text-w texts))
-        w (max 120 (+ (* 2 m/pad) content-w))
+        content-w (apply max 0 (map text-w texts))
+        w (max 120 (+ (* 2 pad) content-w))
         text-lines (count (remove #(= :rule (:kind %)) lines))
         rules (count (filter #(= :rule (:kind %)) lines))
-        h (+ (* 2 m/pad)
-             (* m/line-h text-lines)
-             (* m/pad rules))]
+        h (+ (* 2 pad)
+             (* line-h text-lines)
+             (* pad rules))]
     [w h lines]))
 
 (defn- inherit-edge? [e]
@@ -115,7 +148,7 @@
     (if lr?
       (let [cols (mapv (fn [g]
                          (let [h (+ (apply + (map :h (:items g)))
-                                    (* m/class-gap (max 0 (dec (count (:items g))))))]
+                                    (* class-gap (max 0 (dec (count (:items g))))))]
                            (assoc g :col-h h)))
                        groups)
             total-h (apply max 0 (map :col-h cols))]
@@ -126,13 +159,13 @@
                     placed (second
                              (reduce
                                (fn [[y out] c]
-                                 [(+ y (:h c) m/class-gap)
+                                 [(+ y (:h c) class-gap)
                                   (conj out (assoc (dissoc c :w :h)
                                               :rank (:rank col)
                                               :rect (geom/rect x y (:w c) (:h c))))])
                                [y0 []]
                                (:items col)))]
-                [(+ x (:w col) m/class-rank-gap)
+                [(+ x (:w col) class-rank-gap)
                  (into acc placed)]))
             [0 []]
             cols)))
@@ -142,13 +175,13 @@
             (let [row-placed (second
                                (reduce
                                  (fn [[x out] c]
-                                   [(+ x (:w c) m/class-gap)
+                                   [(+ x (:w c) class-gap)
                                     (conj out (assoc (dissoc c :w :h)
                                                 :rank (:rank row)
                                                 :rect (geom/rect x y (:w c) (:h c))))])
                                  [0 []]
                                  (:items row)))]
-              [(+ y (:h row) m/class-rank-gap)
+              [(+ y (:h row) class-rank-gap)
                (into acc row-placed)]))
           [0 []]
           groups)))))
@@ -158,22 +191,22 @@
         inner (mapv #(assoc %
                        :package (:id pkg)
                        :rank (+ rank-base (:rank % 0))
-                       :rect (geom/rect (+ origin-x m/pad (get-in % [:rect :x]))
-                                        (+ origin-y m/banner-h m/pad (get-in % [:rect :y]))
+                       :rect (geom/rect (+ origin-x pad (get-in % [:rect :x]))
+                                        (+ origin-y banner-h pad (get-in % [:rect :y]))
                                         (get-in % [:rect :w])
                                         (get-in % [:rect :h])))
                     inner)
         title (str (:label pkg)
-                   (when-let [c (m/format-crap (:crap pkg))]
+                   (when-let [c (format-crap (:crap pkg))]
                      (str "    " c)))
         body (or (geom/union (map :rect inner))
-                 (geom/rect (+ origin-x m/pad)
-                            (+ origin-y m/banner-h m/pad)
+                 (geom/rect (+ origin-x pad)
+                            (+ origin-y banner-h pad)
                             160 40))
-        pack-w (max (- (+ (geom/right body) m/pad) origin-x)
-                    (+ (* 2 m/pad) (m/text-w title))
+        pack-w (max (- (+ (geom/right body) pad) origin-x)
+                    (+ (* 2 pad) (text-w title))
                     180)
-        pack-h (- (+ (geom/bottom body) m/pad) origin-y)
+        pack-h (- (+ (geom/bottom body) pad) origin-y)
         pack-rect (geom/rect origin-x origin-y pack-w pack-h)]
     {:id (:id pkg)
      :label (:label pkg)
@@ -182,9 +215,27 @@
      :rect pack-rect
      :classes inner}))
 
+(defn- oval-size [c]
+  (let [w (max 80 (+ (* 2 pad) (text-w (:name c))))
+        h (max 44 (long (* 0.55 w)))]
+    [w h]))
+
+(defn- layout-foreigns [foreigns origin-x origin-y]
+  (second
+    (reduce
+      (fn [[y acc] c]
+        (let [[w h] (oval-size c)]
+          [(+ y h class-gap)
+           (conj acc (assoc c
+                       :shape :oval
+                       :lines [{:kind :name :text (:name c)}]
+                       :rect (geom/rect origin-x y w h)))]))
+      [origin-y []]
+      foreigns)))
+
 (defn layout
   "Content-size classes, Sugiyama-place them inside packages, stack packages
-   in document order."
+   in document order. Foreign ovals sit to the right of the layer stack."
   [diagram]
   (let [edges (:edges diagram)
         direction (:direction diagram :tb)
@@ -193,16 +244,30 @@
         laid (second
                (reduce
                  (fn [[y packs] [i pkg]]
-                   (let [lp (layout-package pkg m/margin y edges direction (* i stride))]
-                     [(+ y (get-in lp [:rect :h]) m/rank-gap)
+                   (let [lp (layout-package pkg margin y edges direction (* i stride))]
+                     [(+ y (get-in lp [:rect :h]) rank-gap)
                       (conj packs lp)]))
-                 [m/margin []]
+                 [margin []]
                  (map-indexed vector pkgs)))
-        classes (mapcat :classes laid)
-        bounds (or (geom/union (map :rect laid))
-                   (geom/rect 0 0 400 300))]
+        pack-classes (mapcat :classes laid)
+        pack-bounds (or (geom/union (map :rect laid))
+                        (geom/rect margin margin 400 300))
+        fx (+ (geom/right pack-bounds) pack-gap)
+        fy (:y pack-bounds)
+        ovals (layout-foreigns (:foreign diagram) fx fy)
+        oval-h (if (seq ovals)
+                 (- (geom/bottom (:rect (last ovals))) fy)
+                 0)
+        dy (if (and (seq ovals) (> (:h pack-bounds) oval-h))
+             (/ (- (:h pack-bounds) oval-h) 2.0)
+             0)
+        ovals (mapv #(update % :rect (fn [r] (geom/rect (:x r) (+ (:y r) dy) (:w r) (:h r))))
+                    ovals)
+        classes (into (vec pack-classes) ovals)
+        bounds (or (geom/union (concat (map :rect laid) (map :rect ovals)))
+                   pack-bounds)]
     {:diagram diagram
      :packages (mapv #(dissoc % :classes) laid)
-     :classes (vec classes)
-     :size {:w (+ (geom/right bounds) m/margin)
-            :h (+ (geom/bottom bounds) m/margin)}}))
+     :classes classes
+     :size {:w (+ (geom/right bounds) margin)
+            :h (+ (geom/bottom bounds) margin)}}))

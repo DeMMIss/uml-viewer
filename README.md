@@ -72,13 +72,15 @@ Edit `examples/uml-viewer.policy.edn`, then run `clj -M:ir`.
 The **parser** (`LanguageGraph`) reads source and emits facts: one class per
 project namespace, `:require` / `:use` of another project ns as
 `:dependency`, `defprotocol` as `:stereotype :interface`, `defrecord` /
-`deftype` of a protocol as `:implements`. External libs (`clojure.*`, `quil`,
-Java) are dropped. Members are not authored — overlay fills them from
-`.metrics/`.
+`deftype` of a protocol as `:implements`. External `:require`s and `:import`s
+become **foreign** classes (the full lib name). Members are not authored —
+overlay fills them from `.metrics/`.
 
-The **policy** is the judgment the parser cannot make: which ns belongs to
-which layer, which diagrams to draw, and the few require-vs-association
-overrides.
+The **policy** records the dependency structure the source already has:
+which ns belongs to which layer, which diagrams to draw, and the few
+require-vs-association overrides. It does not create partitions. Do not
+re-home a namespace in `:nses` to fake a layer; change the requires (or
+the ns), then update the policy to match.
 
 ```edn
 {:title "UML viewer"
@@ -86,6 +88,7 @@ overrides.
  :prefix "uml-viewer"
  :lang :clojure
  :out "examples/uml-viewer.edn"
+ :foreign [quil]
  :packages
  [{:id :adapters :label "Adapters" :nses [draw sketch core]}
   {:id :app :label "Application" :nses [events detail]}
@@ -112,19 +115,26 @@ that sequence, so arrows on the Layers overview point down.
 | `:hide-members` | Compact boxes (Layers overview, and all stubs) |
 | `:direction` | `:tb` (overview default) or `:lr` (layer default) |
 | `:lang` | Which `LanguageGraph` to use (default `:clojure`) |
+| `:foreign` | External libs to show as ovals outside every layer. A listed prefix collapses `quil.core` and `quil.middleware` to `quil`. Unlisted externals (`clojure.string`) are omitted. |
 
 **Viewer Grok loop** (passed with `--rules` to the companion session only)
 
 After **every** source or policy change: `clj -M:crap`, `clj -M:mutate` on
 the changed `src/` files, then `clj -M:ir`. Do not wait to be asked.
+Uncovered mutants remaining are coverage gaps; keep the snapshot and do
+not re-run the file or force a full mutation because mutate exited
+non-zero.
 
 - Add/rename/delete a namespace, or change a `:require` / protocol: no
   policy edit unless layering changed; still regenerate.
 - New ns not listed in any `:nses` appears under **Unassigned**. Put it in
   a package and regenerate.
-- Move a ns to another layer: edit `:nses`, then the usual crap/mutate/ir.
+- Move a ns to another layer: change its requires so the dependency is
+  real, then edit `:nses` to match, then the usual crap/mutate/ir.
 - New layer or diagram: add a package or diagram entry, then crap/mutate/ir.
 - “This require is really an association”: one `:edge-kinds` entry.
+- Show a library like quil as an oval: add it to `:foreign`.
+
 - Hand-written sample IRs (e.g. `examples/library.edn`) are still valid;
   they are not generated.
 

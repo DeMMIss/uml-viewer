@@ -1,6 +1,6 @@
 (ns uml-viewer.route
   (:require [uml-viewer.geom :as geom]
-            [uml-viewer.metrics :as m]))
+            [uml-viewer.layout :as layout]))
 
 (defn- class-by-id [scene]
   (into {} (map (juxt :id identity) (:classes scene))))
@@ -84,7 +84,7 @@
       {:lo a :hi b :span (- b a)})))
 
 (defn- lane-coord [ch i n]
-  (let [span (max m/lane-gap (:span ch 0))
+  (let [span (max layout/lane-gap (:span ch 0))
         step (/ span (double (inc (max n 1))))]
     (+ (:lo ch) (* (inc i) step))))
 
@@ -164,7 +164,7 @@
         start (port from from-face from-t)
         end (port to to-face to-t)
         bb (or (geom/union [(:rect from) (:rect to)]) (:rect from))
-        pad (+ m/lane-gap (* i m/lane-gap))]
+        pad (+ layout/lane-gap (* i layout/lane-gap))]
     (case side
       :east (let [track (+ (geom/right bb) pad)]
               (collapse [start [track (second start)] [track (second end)] end]))
@@ -176,7 +176,7 @@
                (collapse [start [(first start) track] [(first end) track] end])))))
 
 (defn- around-bbox [bb start end i lr?]
-  (let [pad (+ (* 2 m/lane-gap) (* i m/lane-gap))]
+  (let [pad (+ (* 2 layout/lane-gap) (* i layout/lane-gap))]
     (if lr?
       (let [track (+ (geom/right bb) pad)]
         (collapse [start [track (second start)] [track (second end)] end]))
@@ -189,14 +189,14 @@
       (let [y (clamp (/ (+ (second start) (second end)) 2.0)
                      (:y bb)
                      (geom/bottom bb))
-            left (- (:x bb) (+ m/lane-gap (* i m/lane-gap)))
-            right (+ (geom/right bb) (+ m/lane-gap (* i m/lane-gap)))]
+            left (- (:x bb) (+ layout/lane-gap (* i layout/lane-gap)))
+            right (+ (geom/right bb) (+ layout/lane-gap (* i layout/lane-gap)))]
         [[left y] [right y]])
       (let [x (clamp (/ (+ (first start) (first end)) 2.0)
                      (:x bb)
                      (geom/right bb))
-            top (- (:y bb) (+ m/lane-gap (* i m/lane-gap)))
-            bot (+ (geom/bottom bb) (+ m/lane-gap (* i m/lane-gap)))]
+            top (- (:y bb) (+ layout/lane-gap (* i layout/lane-gap)))
+            bot (+ (geom/bottom bb) (+ layout/lane-gap (* i layout/lane-gap)))]
         [[x top] [x bot]]))))
 
 (defn- through-intermediates [from to start end classes i lr?]

@@ -21,7 +21,9 @@
      :label "Application",
      :classes
      [{:id :events, :name "Events", :hide-members true}
-      {:id :detail, :name "Detail", :hide-members true}]}
+      {:id :document, :name "Document", :hide-members true}
+      {:id :detail, :name "Detail", :hide-members true}
+      {:id :overlay, :name "Overlay", :hide-members true}]}
     {:id :engine,
      :label "Engine",
      :classes
@@ -45,22 +47,16 @@
      :classes
      [{:id :ir, :name "Ir", :hide-members true}
       {:id :geom, :name "Geom", :hide-members true}
-      {:id :metrics, :name "Metrics", :hide-members true}
-      {:id :theme, :name "Theme", :hide-members true}
-      {:id :overlay, :name "Overlay", :hide-members true}
-      {:id :source-html, :name "SourceHtml", :hide-members true}
-      {:id :grok, :name "Grok", :hide-members true}
       {:id :policy, :name "Policy", :hide-members true}]}],
    :edges
-   [{:from :core, :to :grok, :kind :dependency}
-    {:from :detail, :to :metrics, :kind :dependency}
-    {:from :events, :to :hit, :kind :dependency}
+   [{:from :events, :to :hit, :kind :dependency}
     {:from :sketch, :to :source-window, :kind :dependency}
+    {:from :draw, :to :layout, :kind :dependency}
     {:from :events, :to :detail, :kind :dependency}
     {:from :compose, :to :geom, :kind :dependency}
+    {:from :sketch, :to :quil, :kind :dependency}
     {:from :main.uml-viewer, :to :core, :kind :dependency}
-    {:from :grok, :to :theme, :kind :dependency}
-    {:from :events, :to :compose, :kind :dependency}
+    {:from :sketch, :to :javax.swing, :kind :dependency}
     {:from :draw, :to :curve, :kind :dependency}
     {:from :draw, :to :geom, :kind :dependency}
     {:from :hit, :to :geom, :kind :dependency}
@@ -69,35 +65,37 @@
     {:from :draw, :to :hit, :kind :dependency}
     {:from :main.ir-generator, :to :graph.clojure, :kind :dependency}
     {:from :route, :to :geom, :kind :dependency}
-    {:from :events, :to :layout, :kind :dependency}
+    {:from :draw, :to :quil, :kind :dependency}
     {:from :sketch, :to :detail, :kind :dependency}
-    {:from :core, :to :events, :kind :dependency}
-    {:from :draw, :to :metrics, :kind :dependency}
+    {:from :sketch, :to :document, :kind :dependency}
+    {:from :sketch, :to :layout, :kind :dependency}
     {:from :detail, :to :overlay, :kind :dependency}
-    {:from :route, :to :metrics, :kind :dependency}
+    {:from :document, :to :ir, :kind :dependency}
     {:from :sketch, :to :events, :kind :dependency}
+    {:from :document, :to :hit, :kind :dependency}
     {:from :graph.clojure, :to :graph, :kind :implements}
+    {:from :detail, :to :layout, :kind :dependency}
+    {:from :document, :to :compose, :kind :dependency}
     {:from :sketch, :to :draw, :kind :dependency}
     {:from :core, :to :sketch, :kind :dependency}
+    {:from :core, :to :document, :kind :dependency}
     {:from :detail, :to :hit, :kind :dependency}
-    {:from :events, :to :route, :kind :dependency}
+    {:from :document, :to :overlay, :kind :dependency}
+    {:from :source-window, :to :javax.swing, :kind :dependency}
     {:from :main.ir-generator, :to :ir-generator, :kind :dependency}
     {:from :ir-generator, :to :policy, :kind :dependency}
-    {:from :draw, :to :theme, :kind :dependency}
-    {:from :sketch, :to :grok, :kind :dependency}
+    {:from :overlay, :to :ir, :kind :dependency}
     {:from :main.uml-viewer, :to :source.clojure, :kind :dependency}
     {:from :source.clojure, :to :source, :kind :implements}
-    {:from :events, :to :metrics, :kind :dependency}
-    {:from :events, :to :ir, :kind :dependency}
-    {:from :layout, :to :metrics, :kind :dependency}
+    {:from :route, :to :layout, :kind :dependency}
     {:from :source-window, :to :source, :kind :dependency}
-    {:from :source-window, :to :source-html, :kind :dependency}
-    {:from :compose, :to :metrics, :kind :dependency}
-    {:from :events, :to :overlay, :kind :dependency}
     {:from :ir-generator, :to :graph, :kind :dependency}
     {:from :compose, :to :layout, :kind :dependency}
     {:from :curve, :to :geom, :kind :dependency}
-    {:from :draw, :to :detail, :kind :dependency}]}
+    {:from :draw, :to :detail, :kind :dependency}],
+   :foreign
+   [{:id :javax.swing, :name "javax.swing", :shape :oval}
+    {:id :quil, :name "quil", :shape :oval}]}
   {:title "Main",
    :direction :lr,
    :packages
@@ -106,14 +104,14 @@
      :classes
      [{:id :main.uml-viewer, :name "MainUmlViewer"}
       {:id :main.ir-generator, :name "MainIrGenerator"}
+      {:id :core, :name "Core", :hide-members true}
       {:id :graph.clojure, :name "GraphClojure", :hide-members true}
       {:id :ir-generator, :name "IrGenerator", :hide-members true}
-      {:id :core, :name "Core", :hide-members true}
       {:id :source.clojure, :name "SourceClojure", :hide-members true}]}],
    :edges
-   [{:from :main.ir-generator, :to :graph.clojure, :kind :association}
+   [{:from :main.uml-viewer, :to :core, :kind :association}
+    {:from :main.ir-generator, :to :graph.clojure, :kind :association}
     {:from :main.ir-generator, :to :ir-generator, :kind :association}
-    {:from :main.uml-viewer, :to :core, :kind :association}
     {:from :main.uml-viewer, :to :source.clojure, :kind :association}]}
   {:title "Adapters",
    :direction :lr,
@@ -126,37 +124,40 @@
       {:id :core, :name "Core"}
       {:id :source-window, :name "SourceWindow"}
       {:id :ir-generator, :name "IrGenerator"}
-      {:id :events, :name "Events", :hide-members true}
-      {:id :grok, :name "Grok", :hide-members true}
-      {:id :geom, :name "Geom", :hide-members true}
+      {:id :layout, :name "Layout", :hide-members true}
       {:id :curve, :name "Curve", :hide-members true}
-      {:id :detail, :name "Detail", :hide-members true}
+      {:id :geom, :name "Geom", :hide-members true}
       {:id :hit, :name "Hit", :hide-members true}
-      {:id :metrics, :name "Metrics", :hide-members true}
-      {:id :theme, :name "Theme", :hide-members true}
-      {:id :graph, :name "Graph", :stereotype :interface, :hide-members true}
+      {:id :detail, :name "Detail", :hide-members true}
+      {:id :document, :name "Document", :hide-members true}
+      {:id :events, :name "Events", :hide-members true}
       {:id :policy, :name "Policy", :hide-members true}
       {:id :source, :name "Source", :stereotype :interface, :hide-members true}
-      {:id :source-html, :name "SourceHtml", :hide-members true}]}],
+      {:id :graph, :name "Graph", :stereotype :interface, :hide-members true}]}],
    :edges
-   [{:from :core, :to :grok, :kind :dependency}
-    {:from :sketch, :to :source-window, :kind :dependency}
+   [{:from :sketch, :to :source-window, :kind :dependency}
+    {:from :draw, :to :layout, :kind :dependency}
+    {:from :sketch, :to :quil, :kind :dependency}
+    {:from :sketch, :to :javax.swing, :kind :dependency}
     {:from :draw, :to :curve, :kind :dependency}
     {:from :draw, :to :geom, :kind :dependency}
     {:from :draw, :to :hit, :kind :dependency}
+    {:from :draw, :to :quil, :kind :dependency}
     {:from :sketch, :to :detail, :kind :dependency}
-    {:from :core, :to :events, :kind :dependency}
-    {:from :draw, :to :metrics, :kind :dependency}
+    {:from :sketch, :to :document, :kind :dependency}
+    {:from :sketch, :to :layout, :kind :dependency}
     {:from :sketch, :to :events, :kind :dependency}
     {:from :sketch, :to :draw, :kind :dependency}
     {:from :core, :to :sketch, :kind :association}
+    {:from :core, :to :document, :kind :dependency}
+    {:from :source-window, :to :javax.swing, :kind :dependency}
     {:from :ir-generator, :to :policy, :kind :dependency}
-    {:from :draw, :to :theme, :kind :dependency}
-    {:from :sketch, :to :grok, :kind :dependency}
     {:from :source-window, :to :source, :kind :dependency}
-    {:from :source-window, :to :source-html, :kind :dependency}
     {:from :ir-generator, :to :graph, :kind :dependency}
-    {:from :draw, :to :detail, :kind :dependency}]}
+    {:from :draw, :to :detail, :kind :dependency}],
+   :foreign
+   [{:id :javax.swing, :name "javax.swing", :shape :oval}
+    {:id :quil, :name "quil", :shape :oval}]}
   {:title "Application",
    :direction :lr,
    :packages
@@ -164,26 +165,24 @@
      :label "Application",
      :classes
      [{:id :events, :name "Events"}
+      {:id :document, :name "Document"}
       {:id :detail, :name "Detail"}
+      {:id :overlay, :name "Overlay"}
       {:id :hit, :name "Hit", :hide-members true}
-      {:id :metrics, :name "Metrics", :hide-members true}
-      {:id :overlay, :name "Overlay", :hide-members true}
-      {:id :compose, :name "Compose", :hide-members true}
       {:id :ir, :name "Ir", :hide-members true}
       {:id :layout, :name "Layout", :hide-members true}
-      {:id :route, :name "Route", :hide-members true}]}],
+      {:id :compose, :name "Compose", :hide-members true}]}],
    :edges
-   [{:from :detail, :to :metrics, :kind :dependency}
-    {:from :events, :to :hit, :kind :dependency}
+   [{:from :events, :to :hit, :kind :dependency}
     {:from :events, :to :detail, :kind :dependency}
-    {:from :events, :to :compose, :kind :association}
-    {:from :events, :to :layout, :kind :dependency}
     {:from :detail, :to :overlay, :kind :dependency}
+    {:from :document, :to :ir, :kind :dependency}
+    {:from :document, :to :hit, :kind :dependency}
+    {:from :detail, :to :layout, :kind :dependency}
+    {:from :document, :to :compose, :kind :association}
     {:from :detail, :to :hit, :kind :dependency}
-    {:from :events, :to :route, :kind :dependency}
-    {:from :events, :to :metrics, :kind :dependency}
-    {:from :events, :to :ir, :kind :dependency}
-    {:from :events, :to :overlay, :kind :dependency}]}
+    {:from :document, :to :overlay, :kind :dependency}
+    {:from :overlay, :to :ir, :kind :dependency}]}
   {:title "Engine",
    :direction :lr,
    :packages
@@ -195,17 +194,14 @@
       {:id :curve, :name "Curve"}
       {:id :compose, :name "Compose"}
       {:id :hit, :name "Hit"}
-      {:id :geom, :name "Geom", :hide-members true}
-      {:id :metrics, :name "Metrics", :hide-members true}]}],
+      {:id :geom, :name "Geom", :hide-members true}]}],
    :edges
    [{:from :compose, :to :geom, :kind :dependency}
     {:from :hit, :to :geom, :kind :dependency}
     {:from :layout, :to :geom, :kind :dependency}
     {:from :compose, :to :route, :kind :association}
     {:from :route, :to :geom, :kind :dependency}
-    {:from :route, :to :metrics, :kind :dependency}
-    {:from :layout, :to :metrics, :kind :dependency}
-    {:from :compose, :to :metrics, :kind :dependency}
+    {:from :route, :to :layout, :kind :dependency}
     {:from :compose, :to :layout, :kind :association}
     {:from :curve, :to :geom, :kind :dependency}]}
   {:title "SourceFactory",
@@ -236,12 +232,5 @@
    [{:id :domain,
      :label "Domain",
      :classes
-     [{:id :ir, :name "Ir"}
-      {:id :geom, :name "Geom"}
-      {:id :metrics, :name "Metrics"}
-      {:id :theme, :name "Theme"}
-      {:id :overlay, :name "Overlay"}
-      {:id :source-html, :name "SourceHtml"}
-      {:id :grok, :name "Grok"}
-      {:id :policy, :name "Policy"}]}],
-   :edges [{:from :grok, :to :theme, :kind :dependency}]}]}
+     [{:id :ir, :name "Ir"} {:id :geom, :name "Geom"} {:id :policy, :name "Policy"}]}],
+   :edges []}]}

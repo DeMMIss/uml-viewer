@@ -68,10 +68,9 @@
     (let [owners (set (map (comp str :ns) (violations (constantly true) quil-lib?)))]
       (should= #{"uml-viewer.draw" "uml-viewer.sketch"} owners)))
 
-  (it "keeps source lookup and grok spawn free of Swing and Quil"
+  (it "keeps source lookup free of Swing and Quil"
     (should= [] (violations #(contains? #{"uml-viewer.source"
-                                         "uml-viewer.source.clojure"
-                                         "uml-viewer.grok"} (str %))
+                                         "uml-viewer.source.clojure"} (str %))
                             #(or (quil-lib? %)
                                  (#{'javax.swing 'java.awt} %)))))
 

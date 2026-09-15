@@ -6,6 +6,16 @@
             [uml-viewer.layout :as layout]
             [uml-viewer.route :as route]))
 
+(describe "formatters"
+  (it "formats coverage, mutants, and crap"
+    (should= "90%" (layout/format-coverage 0.9))
+    (should-be-nil (layout/format-coverage nil))
+    (should= "3 killed / 1 survived" (layout/format-mutants 3 1))
+    (should-be-nil (layout/format-mutants nil nil))
+    (should= "μ 1.2   max 2.0   σ 0.4"
+             (layout/format-crap {:mu 1.2 :max 2.0 :sigma 0.4}))
+    (should-be-nil (layout/format-crap nil))))
+
 (def sample
   (ir/normalize
     {:packages
@@ -77,12 +87,28 @@
 
   (it "keeps class boxes inside their package"
     (let [scene (layout/layout (ir/load-diagram "examples/library.edn"))]
-      (doseq [c (:classes scene)]
+      (doseq [c (remove #(= :oval (:shape %)) (:classes scene))]
         (let [p (first (filter #(= (:package c) (:id %)) (:packages scene)))
               r (:rect c)
               pr (:rect p)]
           (should (geom/inside? pr (:x r) (:y r)))
           (should (geom/inside? pr (geom/right r) (geom/bottom r)))))))
+
+  (it "places foreign ovals to the right of packages"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :a :name "A"}]}]
+               :foreign [{:id :quil :name "quil" :shape :oval}]
+               :edges [{:from :a :to :quil :kind :dependency}]})
+          scene (layout/layout d)
+          a (first (filter #(= :a (:id %)) (:classes scene)))
+          q (first (filter #(= :quil (:id %)) (:classes scene)))
+          p (first (:packages scene))]
+      (should= :oval (:shape q))
+      (should-be-nil (:package q))
+      (should (< (geom/right (:rect p)) (:x (:rect q))))
+      (should (geom/inside? (:rect p) (geom/cx (:rect a)) (geom/cy (:rect a))))))
 
   (it "does not overlap class boxes"
     (let [scene (layout/layout (ir/load-diagram "examples/library.edn"))

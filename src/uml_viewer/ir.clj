@@ -65,6 +65,7 @@
       (throw (ex-info "class needs :name or :id" {:class c})))
     {:id (as-id (or (:id c) name))
      :name name
+     :shape (when (or (:foreign c) (= :oval (keyword (:shape c)))) :oval)
      :stereotype (:stereotype c)
      :crap (as-crap (:crap c))
      :coverage (as-coverage (:coverage c))
@@ -96,8 +97,10 @@
   (let [diagram {:title (or (:title raw) "UML")
                  :direction (keyword (or (:direction raw) :tb))
                  :packages (mapv as-package (:packages raw))
+                 :foreign (mapv as-class (:foreign raw))
                  :edges (mapv as-edge (:edges raw))}
-        class-ids (mapcat (fn [p] (map :id (:classes p))) (:packages diagram))
+        class-ids (concat (mapcat (fn [p] (map :id (:classes p))) (:packages diagram))
+                          (map :id (:foreign diagram)))
         dup (ffirst (filter #(> (val %) 1) (frequencies class-ids)))]
     (when dup
       (throw (ex-info (str "duplicate class id: " dup) {:id dup})))
@@ -125,9 +128,12 @@
 
 (defn class-index [diagram]
   (into {}
-        (for [p (:packages diagram)
-              c (:classes p)]
-          [(:id c) (assoc c :package (:id p))])))
+        (concat
+          (for [p (:packages diagram)
+                c (:classes p)]
+            [(:id c) (assoc c :package (:id p))])
+          (for [c (:foreign diagram)]
+            [(:id c) c]))))
 
 (defn package-of [diagram class-id]
   (:package (get (class-index diagram) class-id)))

@@ -1,4 +1,5 @@
-(ns uml-viewer.policy)
+(ns uml-viewer.policy
+  (:require [clojure.string :as str]))
 
 (defn- as-id [x]
   (keyword (name x)))
@@ -14,10 +15,25 @@
   [policy]
   (set (mapcat package-nses (:packages policy))))
 
+(defn- foreign-prefixes [policy]
+  (mapv as-id (or (:foreign policy) [])))
+
+(defn- matches-prefix? [id prefix]
+  (let [s (name id)
+        p (name prefix)]
+    (or (= s p) (str/starts-with? s (str p ".")))))
+
+(defn- collapse-id [id prefixes]
+  (->> prefixes
+       (filter #(matches-prefix? id %))
+       (sort-by (comp - count name))
+       first))
+
 (defn unassigned
-  "Scanned classes that no package lists."
+  "Scanned project classes that no package lists. Foreign classes are omitted."
   [policy graph]
   (->> (:classes graph)
+       (remove :foreign)
        (remove #(contains? (assigned policy) (:id %)))
        (sort-by (comp name :id))
        vec))
@@ -34,6 +50,33 @@
        (group-by (juxt :from :to))
        vals
        (mapv (fn [es] (apply max-key #(kind-rank (:kind %)) es)))))
+
+(defn collapse-graph
+  "Rewrite foreign classes to policy `:foreign` prefixes. Unlisted externals drop."
+  [policy graph]
+  (let [prefixes (foreign-prefixes policy)
+        remap (into {}
+                    (keep (fn [c]
+                            (when (:foreign c)
+                              (when-let [p (collapse-id (:id c) prefixes)]
+                                [(:id c) p])))
+                          (:classes graph)))
+        project (vec (remove :foreign (:classes graph)))
+        foreigns (->> (vals remap)
+                      distinct
+                      (sort-by name)
+                      (mapv (fn [id] {:id id :name (name id) :foreign true})))
+        classes (into project foreigns)
+        ids (set (map :id classes))
+        edges (->> (:edges graph)
+                   (map (fn [e]
+                          (assoc e
+                            :from (get remap (:from e) (:from e))
+                            :to (get remap (:to e) (:to e)))))
+                   (filter #(and (ids (:from %)) (ids (:to %))))
+                   (remove #(= (:from %) (:to %)))
+                   merge-edges)]
+    {:classes classes :edges edges}))
 
 (defn- apply-kinds [edges diagram]
   (let [kinds (or (:edge-kinds diagram) {})
@@ -63,11 +106,36 @@
 (defn- ir-class [c hide?]
   (cond-> {:id (:id c) :name (:name c)}
     (:stereotype c) (assoc :stereotype (:stereotype c))
-    hide? (assoc :hide-members true)))
+    (:foreign c) (assoc :shape :oval)
+    (and hide? (not (:foreign c))) (assoc :hide-members true)))
 
 (defn- visible-class [idx id hide?]
   (when-let [c (lookup-class idx id)]
     (ir-class c hide?)))
+
+(defn- lookup [graph id]
+  (first (filter #(= id (:id %)) (:classes graph))))
+
+(defn- foreigns-from [graph from-ids]
+  (let [from (set from-ids)
+        wanted (set (for [e (:edges graph)
+                          :when (from (:from e))
+                          :let [c (lookup graph (:to e))]
+                          :when (:foreign c)]
+                      (:id c)))]
+    (->> (:classes graph)
+         (filter :foreign)
+         (filter #(wanted (:id %)))
+         (sort-by (comp name :id))
+         vec)))
+
+(defn- neighbors [graph home-ids]
+  (let [homes (set home-ids)]
+    (vec (distinct
+           (for [e (:edges graph)
+                 :when (homes (:from e))
+                 :when (not (homes (:to e)))]
+             (:to e))))))
 
 (defn- overview-diagram [policy graph diagram]
   (let [idx (index-classes graph)
@@ -85,19 +153,14 @@
                (conj {:id :unassigned
                       :label "Unassigned"
                       :classes (mapv #(ir-class % hide?) extra)}))
-        ids (mapcat (fn [p] (map :id (:classes p))) pkgs)]
-    {:title (:title diagram)
-     :direction (keyword (or (:direction diagram) :tb))
-     :packages pkgs
-     :edges (edges-among graph ids diagram)}))
-
-(defn- neighbors [graph home-ids]
-  (let [homes (set home-ids)]
-    (vec (distinct
-           (for [e (:edges graph)
-                 :when (homes (:from e))
-                 :when (not (homes (:to e)))]
-             (:to e))))))
+        pkg-ids (mapcat (fn [p] (map :id (:classes p))) pkgs)
+        foreign (foreigns-from graph pkg-ids)
+        ids (concat pkg-ids (map :id foreign))]
+    (cond-> {:title (:title diagram)
+             :direction (keyword (or (:direction diagram) :tb))
+             :packages pkgs
+             :edges (edges-among graph ids diagram)}
+      (seq foreign) (assoc :foreign (mapv #(ir-class % false) foreign)))))
 
 (defn- find-package [policy id]
   (let [want (as-id id)]
@@ -110,26 +173,30 @@
                       {:diagram diagram})))
     (let [idx (index-classes graph)
           home (package-nses pkg)
-          stubs (neighbors graph home)
+          nbrs (neighbors graph home)
+          stubs (remove #(:foreign (lookup graph %)) nbrs)
+          foreign (foreigns-from graph home)
           hide-home? (boolean (:hide-members diagram))
           classes (into []
                         (concat
                           (keep #(visible-class idx % hide-home?) home)
                           (keep #(visible-class idx % true) stubs)))
-          ids (map :id classes)]
-      {:title (:title diagram)
-       :direction (keyword (or (:direction diagram) :lr))
-       :packages [{:id (as-id (:id pkg))
-                   :label (:label pkg)
-                   :classes classes}]
-       :edges (edges-among graph ids diagram home)})))
+          ids (concat (map :id classes) (map :id foreign))]
+      (cond-> {:title (:title diagram)
+               :direction (keyword (or (:direction diagram) :lr))
+               :packages [{:id (as-id (:id pkg))
+                           :label (:label pkg)
+                           :classes classes}]
+               :edges (edges-among graph ids diagram home)}
+        (seq foreign) (assoc :foreign (mapv #(ir-class % false) foreign))))))
 
 (defn apply-policy
   "Turn a scanned graph and a policy into an IR document."
   [policy graph]
-  {:title (or (:title policy) "UML")
-   :diagrams (mapv (fn [d]
-                     (if (= :overview (:view d))
-                       (overview-diagram policy graph d)
-                       (package-diagram policy graph d)))
-                   (:diagrams policy))})
+  (let [graph (collapse-graph policy graph)]
+    {:title (or (:title policy) "UML")
+     :diagrams (mapv (fn [d]
+                       (if (= :overview (:view d))
+                         (overview-diagram policy graph d)
+                         (package-diagram policy graph d)))
+                     (:diagrams policy))}))

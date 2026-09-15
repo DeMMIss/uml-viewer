@@ -3,6 +3,7 @@
  :prefix "uml-viewer"
  :lang :clojure
  :out "examples/uml-viewer.edn"
+ :foreign [quil javax.swing]
  :packages
  [{:id :main
    :label "Main"
@@ -12,7 +13,7 @@
    :nses [draw sketch core source-window ir-generator]}
   {:id :app
    :label "Application"
-   :nses [events detail]}
+   :nses [events document detail overlay]}
   {:id :engine
    :label "Engine"
    :nses [layout route curve compose hit]}
@@ -24,8 +25,7 @@
    :nses [graph source]}
   {:id :domain
    :label "Domain"
-   :nses [ir geom metrics theme overlay source-html
-          grok policy]}]
+   :nses [ir geom policy]}]
  :diagrams
  [{:title "Layers" :view :overview :hide-members true :direction :tb}
   {:title "Main" :package :main
@@ -36,7 +36,7 @@
   {:title "Adapters" :package :adapters
    :edge-kinds {[:core :sketch] :association}}
   {:title "Application" :package :app
-   :edge-kinds {[:events :compose] :association}}
+   :edge-kinds {[:document :compose] :association}}
   {:title "Engine" :package :engine
    :edge-kinds {[:compose :layout] :association
                 [:compose :route] :association}}

@@ -2,11 +2,10 @@
   (:require [quil.core :as q]
             [speclj.core :refer :all]
             [uml-viewer.detail :as detail]
-            [uml-viewer.draw]
-            [uml-viewer.events :as events]
+            [uml-viewer.draw :as draw]
+            [uml-viewer.compose :as compose]
             [uml-viewer.ir :as ir]
-            [uml-viewer.metrics :as m]
-            [uml-viewer.theme :as theme]))
+            [uml-viewer.layout :as layout]))
 
 (defn- call [sym & args]
   (apply (ns-resolve 'uml-viewer.draw sym) args))
@@ -24,6 +23,7 @@
                   q/no-stroke (rec :no-stroke)
                   q/stroke-cap (rec :stroke-cap)
                   q/rect (rec :rect)
+                  q/ellipse (rec :ellipse)
                   q/line (rec :line)
                   q/text (rec :text)
                   q/text-align (rec :text-align)
@@ -58,7 +58,7 @@
   (boolean (some #(color-cmd? % op color) @log)))
 
 (defn- scene []
-  (events/compile-diagram
+  (compose/compile-diagram
     (ir/normalize
       {:title "Tiny"
        :packages
@@ -93,26 +93,26 @@
 
 (describe "draw color helpers"
   (it "maps detail row kinds onto theme inks"
-    (should= theme/ink (call 'detail-row-color {:kind :name}))
-    (should= theme/gold (call 'detail-row-color {:kind :crap}))
-    (should= theme/gold (call 'detail-row-color {:kind :heading}))
-    (should= theme/ink (call 'detail-row-color {:kind :field}))
-    (should= theme/ink (call 'detail-row-color {:kind :rel}))
-    (should= theme/ink (call 'detail-row-color {:kind :stats}))
-    (should= theme/muted (call 'detail-row-color {:kind :muted})))
+    (should= draw/ink (call 'detail-row-color {:kind :name}))
+    (should= draw/gold (call 'detail-row-color {:kind :crap}))
+    (should= draw/gold (call 'detail-row-color {:kind :heading}))
+    (should= draw/ink (call 'detail-row-color {:kind :field}))
+    (should= draw/ink (call 'detail-row-color {:kind :rel}))
+    (should= draw/ink (call 'detail-row-color {:kind :stats}))
+    (should= draw/muted (call 'detail-row-color {:kind :muted})))
 
   (it "colors detail cells by column"
     (let [high {:coverage 0.9 :crap-n 0 :survived 0 :killed 4}
           low {:coverage 0.2 :crap-n 24 :survived 2}]
-      (should= (theme/coverage-ink 0.9) (call 'cell-color high {:id :cov}))
-      (should= (theme/stroke-for {:mu 0}) (call 'cell-color high {:id :crap}))
-      (should= theme/muted (call 'cell-color high {:id :survived}))
-      (should= theme/muted (call 'cell-color high {:id :killed}))
-      (should= theme/muted (call 'cell-color high {:id :cc}))
-      (should= theme/muted (call 'cell-color high {:id :name}))
+      (should= (draw/coverage-ink 0.9) (call 'cell-color high {:id :cov}))
+      (should= (draw/stroke-for {:mu 0}) (call 'cell-color high {:id :crap}))
+      (should= draw/muted (call 'cell-color high {:id :survived}))
+      (should= draw/muted (call 'cell-color high {:id :killed}))
+      (should= draw/muted (call 'cell-color high {:id :cc}))
+      (should= draw/muted (call 'cell-color high {:id :name}))
       (should= [224 122 74] (call 'cell-color low {:id :survived}))
-      (should= (theme/stroke-for {:mu 24}) (call 'cell-color low {:id :crap}))
-      (should= (theme/coverage-ink 0.2) (call 'cell-color low {:id :cov})))))
+      (should= (draw/stroke-for {:mu 24}) (call 'cell-color low {:id :crap}))
+      (should= (draw/coverage-ink 0.2) (call 'cell-color low {:id :cov})))))
 
 (describe "obstacle-rects"
   (it "drops dummy classes and the edge's own ends"
@@ -127,18 +127,18 @@
   (it "fills with rgb and optional alpha"
     (record-quil
       (fn [log]
-        (call 'rgb theme/ink)
-        (call 'rgb theme/gold 80)
-        (should (painted? log :fill theme/ink))
-        (should (painted? log :fill (conj (vec theme/gold) 80))))))
+        (call 'rgb draw/ink)
+        (call 'rgb draw/gold 80)
+        (should (painted? log :fill draw/ink))
+        (should (painted? log :fill (conj (vec draw/gold) 80))))))
 
   (it "strokes with optional weight"
     (record-quil
       (fn [log]
-        (call 'stroke-rgb theme/muted)
-        (call 'stroke-rgb theme/gold 2.5)
-        (should (painted? log :stroke theme/muted))
-        (should (painted? log :stroke theme/gold))
+        (call 'stroke-rgb draw/muted)
+        (call 'stroke-rgb draw/gold 2.5)
+        (should (painted? log :stroke draw/muted))
+        (should (painted? log :stroke draw/gold))
         (should-contain [:stroke-weight 2.5] @log)))))
 
 (describe "arrowhead"
@@ -146,7 +146,7 @@
     (record-quil
       (fn [log]
         (call 'arrowhead :triangle [10 0] [0 0])
-        (should (painted? log :fill theme/bg))
+        (should (painted? log :fill draw/bg))
         (should-contain :triangle (kinds log))
         (should-not-contain :quad (kinds log))
         (should-not-contain :line (kinds log)))))
@@ -155,7 +155,7 @@
     (record-quil
       (fn [log]
         (call 'arrowhead :diamond [10 0] [0 0])
-        (should (painted? log :fill theme/bg))
+        (should (painted? log :fill draw/bg))
         (should-contain :quad (kinds log))
         (should-not-contain :triangle (kinds log)))))
 
@@ -163,7 +163,7 @@
     (record-quil
       (fn [log]
         (call 'arrowhead :diamond-fill [10 0] [0 0])
-        (should (painted? log :fill theme/ink))
+        (should (painted? log :fill draw/ink))
         (should-contain :quad (kinds log)))))
 
   (it "draws an open chevron otherwise"
@@ -189,21 +189,21 @@
     (record-quil
       (fn [log]
         (call 'draw-package (a-package) true)
-        (should (painted? log :stroke theme/gold))
+        (should (painted? log :stroke draw/gold))
         (should-contain [:stroke-weight 2.5] @log)
         (should-contain "P" (texts log))
         (reset! log [])
         (call 'draw-package (a-package) false)
-        (should (painted? log :stroke (theme/stroke-for {:mu 2 :max 2 :sigma 0})))
+        (should (painted? log :stroke (draw/stroke-for {:mu 2 :max 2 :sigma 0})))
         (should-contain [:stroke-weight 1.4] @log)))))
 
 (describe "class-line-ink"
   (it "maps line kinds onto theme inks"
-    (should= theme/gold (call 'class-line-ink :crap))
-    (should= theme/muted (call 'class-line-ink :stereo))
-    (should= theme/ink (call 'class-line-ink :name))
-    (should= theme/ink (call 'class-line-ink :field))
-    (should= theme/ink (call 'class-line-ink :op))))
+    (should= draw/gold (call 'class-line-ink :crap))
+    (should= draw/muted (call 'class-line-ink :stereo))
+    (should= draw/ink (call 'class-line-ink :name))
+    (should= draw/ink (call 'class-line-ink :field))
+    (should= draw/ink (call 'class-line-ink :op))))
 
 (describe "draw-rule"
   (it "strokes a CRAP-colored separator and advances by pad"
@@ -212,8 +212,8 @@
         (let [r {:x 10 :y 20 :w 100 :h 90}
               crap {:mu 1 :max 1 :sigma 0}
               y 40]
-          (should= (+ y m/pad) (call 'draw-rule r crap y))
-          (should (painted? log :stroke (theme/stroke-for crap)))
+          (should= (+ y layout/pad) (call 'draw-rule r crap y))
+          (should (painted? log :stroke (draw/stroke-for crap)))
           (should-contain [:stroke-weight 1] @log)
           (should-contain [:line 16 44 104 44] @log))))))
 
@@ -223,20 +223,20 @@
       (fn [log]
         (let [r {:x 10 :y 20 :w 100 :h 90}
               y 36]
-          (should= (+ y m/line-h) (call 'draw-text-line r {:kind :name :text "A"} y))
+          (should= (+ y layout/line-h) (call 'draw-text-line r {:kind :name :text "A"} y))
           (should-contain [:text-size 14] @log)
-          (should (painted? log :fill theme/ink))
+          (should (painted? log :fill draw/ink))
           (should-contain [:text "A" 60.0 36] @log)
           (reset! log [])
           (call 'draw-text-line r {:kind :crap :text "μ 1.0"} y)
           (should-contain [:text-size 12] @log)
-          (should (painted? log :fill theme/gold))
+          (should (painted? log :fill draw/gold))
           (reset! log [])
           (call 'draw-text-line r {:kind :stereo :text "«bean»"} y)
-          (should (painted? log :fill theme/muted))
+          (should (painted? log :fill draw/muted))
           (reset! log [])
           (call 'draw-text-line r {:kind :op :text "go()"} y)
-          (should (painted? log :fill theme/ink)))))))
+          (should (painted? log :fill draw/ink)))))))
 
 (describe "draw-class-line"
   (it "dispatches a rule or a text line and returns the next y"
@@ -245,10 +245,10 @@
         (let [r {:x 10 :y 20 :w 100 :h 90}
               crap {:mu 1 :max 1 :sigma 0}
               y 40]
-          (should= (+ y m/pad) (call 'draw-class-line r crap {:kind :rule} y))
+          (should= (+ y layout/pad) (call 'draw-class-line r crap {:kind :rule} y))
           (should-contain [:line 16 44 104 44] @log)
           (reset! log [])
-          (should= (+ y m/line-h)
+          (should= (+ y layout/line-h)
                    (call 'draw-class-line r crap {:kind :name :text "A"} y))
           (should-contain "A" (texts log))
           (should-not-contain :line (kinds log)))))))
@@ -258,15 +258,15 @@
     (record-quil
       (fn [log]
         (call 'draw-class (a-class) true false)
-        (should (painted? log :stroke theme/gold))
+        (should (painted? log :stroke draw/gold))
         (should-contain [:stroke-weight 2.6] @log)
         (reset! log [])
         (call 'draw-class (a-class) false true)
-        (should (painted? log :stroke theme/ink))
+        (should (painted? log :stroke draw/ink))
         (should-contain [:stroke-weight 1.3] @log)
         (reset! log [])
         (call 'draw-class (a-class) false false)
-        (should (painted? log :stroke (theme/stroke-for {:mu 1 :max 1 :sigma 0}))))))
+        (should (painted? log :stroke (draw/stroke-for {:mu 1 :max 1 :sigma 0}))))))
 
   (it "paints name, CRAP, stereo, a rule, and member text"
     (record-quil
@@ -297,7 +297,17 @@
         (should-contain "I" (texts log))
         (should-not-contain "α" (texts log))
         (should (painted? log :fill [255 255 255]))
-        (should-contain [:text "I" 104 24] @log)))))
+        (should-contain [:text "I" 104 24] @log))))
+
+  (it "paints a foreign dependency as an oval"
+    (record-quil
+      (fn [log]
+        (call 'draw-class {:id :quil :name "quil" :shape :oval
+                           :rect {:x 10 :y 20 :w 80 :h 44}}
+              false false)
+        (should-contain [:ellipse 50.0 42.0 80 44] @log)
+        (should-contain "quil" (texts log))
+        (should-not-contain :rect (kinds log))))))
 
 (describe "draw-sidebar"
   (it "explains the empty inspector"
@@ -356,12 +366,12 @@
         (let [s (scene)
               e (first (filter #(= :inheritance (:kind %)) (:edges s)))]
           (call 'draw-edge e true s)
-          (should (painted? log :stroke theme/gold))
+          (should (painted? log :stroke draw/gold))
           (should-contain [:stroke-weight 2.2] @log)
           (should-contain :triangle (kinds log))
           (reset! log [])
           (call 'draw-edge (dissoc e :head) false s)
-          (should (painted? log :stroke theme/muted))
+          (should (painted? log :stroke draw/muted))
           (should-contain [:stroke-weight 1.4] @log)
           (should-not-contain :triangle (kinds log)))))))
 
@@ -373,7 +383,7 @@
                                 :y 10 :h 18} true)
         (should (painted? log :fill [232 196 72]))
         (should (some #{:rect} (kinds log)))
-        (should (painted? log :fill theme/gold)))))
+        (should (painted? log :fill draw/gold)))))
 
   (it "sizes the name and skips col-header name text"
     (record-quil
@@ -405,7 +415,7 @@
         (should-contain "go" (texts log))
         (should-contain "75%" (texts log))
         (should-contain "1" (texts log))
-        (should (painted? log :fill (theme/coverage-ink 0.75)))
+        (should (painted? log :fill (draw/coverage-ink 0.75)))
         (should (painted? log :fill [224 122 74]))))))
 
 (describe "draw-state"
@@ -437,7 +447,7 @@
           (reset! log [])
           (call 'draw-state (assoc state :selected {:kind :package :id :p}
                                    :hover nil))
-          (should (painted? log :stroke theme/gold)))))))
+          (should (painted? log :stroke draw/gold)))))))
 
 (describe "draw-detail"
   (it "scrolls content and highlights the hovered op"
@@ -451,3 +461,28 @@
           (call 'draw-detail model 0 "go")
           (should (painted? log :fill [232 196 72]))
           (should-contain "+ go(x) : void" (texts log)))))))
+
+(describe "CRAP colors"
+  (it "uses a default fill when mu is missing"
+    (should= [36 52 48] (draw/fill-for nil))
+    (should= [36 52 48] (draw/fill-for {})))
+
+  (it "is green at μ+σ = 0, gold at 12, rust at 24 and above"
+    (should= [30 74 56] (draw/fill-for {:mu 0 :sigma 0}))
+    (should= [61 58 24] (draw/fill-for {:mu 12}))
+    (should= [61 58 24] (draw/fill-for {:mu 6 :sigma 6}))
+    (should= [74 40 24] (draw/fill-for {:mu 24}))
+    (should= [74 40 24] (draw/fill-for {:mu 100})))
+
+  (it "strokes the same μ+σ ramp"
+    (should= [90 110 100] (draw/stroke-for nil))
+    (should= [95 181 138] (draw/stroke-for {:mu 0}))
+    (should= [212 192 90] (draw/stroke-for {:mu 12 :sigma 0}))
+    (should= [224 122 74] (draw/stroke-for {:mu 24}))))
+
+(describe "coverage colors"
+  (it "bands ink by coverage, high to low"
+    (should= draw/muted (draw/coverage-ink nil))
+    (should= [95 181 138] (draw/coverage-ink 0.8))
+    (should= draw/gold (draw/coverage-ink 0.5))
+    (should= [224 122 74] (draw/coverage-ink 0.49))))

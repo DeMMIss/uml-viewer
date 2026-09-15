@@ -11,16 +11,25 @@
               :stereotype :interface}
              {:id :source.clojure :name "SourceClojure"
               :ns "uml-viewer.source.clojure"}
-             {:id :orphan :name "Orphan" :ns "uml-viewer.orphan"}]
+             {:id :orphan :name "Orphan" :ns "uml-viewer.orphan"}
+             {:id :quil.core :name "quil.core" :ns "quil.core" :foreign true}
+             {:id :quil.middleware :name "quil.middleware" :ns "quil.middleware"
+              :foreign true}
+             {:id :clojure.string :name "clojure.string" :ns "clojure.string"
+              :foreign true}]
    :edges [{:from :layout :to :ir :kind :dependency}
            {:from :layout :to :compose :kind :dependency}
            {:from :compose :to :ir :kind :dependency}
            {:from :events :to :layout :kind :dependency}
            {:from :source.clojure :to :source :kind :dependency}
-           {:from :source.clojure :to :source :kind :implements}]})
+           {:from :source.clojure :to :source :kind :implements}
+           {:from :layout :to :quil.core :kind :dependency}
+           {:from :layout :to :quil.middleware :kind :dependency}
+           {:from :events :to :clojure.string :kind :dependency}]})
 
 (def policy
   {:title "Demo"
+   :foreign [:quil]
    :packages
    [{:id :domain :label "Domain" :nses [:ir :source :source.clojure]}
     {:id :engine :label "Engine" :nses [:layout]}
@@ -68,6 +77,29 @@
       (should (contains? by-id :compose))
       (should-not (some #(and (= :compose (:from %)) (= :ir (:to %)))
                         (:edges engine)))))
+
+  (it "collapses listed foreign prefixes and drops the rest"
+    (let [g (policy/collapse-graph policy graph)
+          by-id (into {} (map (juxt :id identity) (:classes g)))
+          edges (set (map (juxt :from :to) (:edges g)))]
+      (should (:foreign (by-id :quil)))
+      (should= "quil" (:name (by-id :quil)))
+      (should-not (contains? by-id :quil.core))
+      (should-not (contains? by-id :clojure.string))
+      (should (contains? edges [:layout :quil]))
+      (should-not (some #(= :clojure.string (second %)) edges))))
+
+  (it "places foreign ovals outside packages on overview and package diagrams"
+    (let [doc (policy/apply-policy policy graph)
+          layers (first (:diagrams doc))
+          engine (second (:diagrams doc))]
+      (should= [{:id :quil :name "quil" :shape :oval}] (:foreign layers))
+      (should (some #(and (= :layout (:from %)) (= :quil (:to %))) (:edges layers)))
+      (should-not (some #(= :quil (:id %))
+                        (mapcat :classes (:packages layers))))
+      (should= [{:id :quil :name "quil" :shape :oval}] (:foreign engine))
+      (should-not (some #(= :quil (:id %))
+                        (:classes (first (:packages engine)))))))
 
   (it "throws when a diagram names a missing package"
     (should-throw

@@ -1,12 +1,12 @@
 (ns uml-viewer.hit-spec
   (:require [speclj.core :refer :all]
-            [uml-viewer.events :as events]
+            [uml-viewer.compose :as compose]
             [uml-viewer.geom :as geom]
             [uml-viewer.hit :as hit]
             [uml-viewer.ir :as ir]))
 
 (defn scene []
-  (events/compile-diagram
+  (compose/compile-diagram
     (ir/normalize
       {:packages
        [{:id :p :label "P"

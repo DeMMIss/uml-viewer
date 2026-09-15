@@ -1,8 +1,10 @@
 (ns uml-viewer.compose
   (:require [uml-viewer.geom :as geom]
             [uml-viewer.layout :as layout]
-            [uml-viewer.metrics :as m]
             [uml-viewer.route :as route]))
+
+(defn compile-diagram [diagram]
+  (route/route (layout/layout diagram)))
 
 (defn- qid [idx id]
   (keyword (str "d" idx "-" (name id))))
@@ -20,7 +22,7 @@
                 (fn [cs]
                   (mapv #(assoc %
                            :id (q (:id %))
-                           :package (q (:package %)))
+                           :package (when-let [p (:package %)] (q p)))
                         cs)))
         (update :edges
                 (fn [es]
@@ -52,7 +54,7 @@
         [total-h sections]
         (reduce
           (fn [[y acc] s]
-            (let [s' (translate s m/margin (+ y title-h))]
+            (let [s' (translate s layout/margin (+ y title-h))]
               [(+ y title-h (get-in s [:size :h]) gap)
                (conj acc (assoc s' :title-y y))]))
           [24 []]
@@ -63,5 +65,5 @@
      :packages (vec (mapcat :packages sections))
      :edges (vec (mapcat :edges sections))
      :diagram {:title (:title doc)}
-     :size {:w (+ m/margin (apply max 400 (map #(get-in % [:size :w]) sections)))
+     :size {:w (+ layout/margin (apply max 400 (map #(get-in % [:size :w]) sections)))
             :h total-h}}))

@@ -1,11 +1,14 @@
 (ns uml-viewer.sketch
-  (:require [quil.applet :as applet]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            [quil.applet :as applet]
             [quil.core :as q]
             [quil.middleware :as m]
             [uml-viewer.detail :as detail]
+            [uml-viewer.document :as document]
             [uml-viewer.draw :as draw]
             [uml-viewer.events :as events]
-            [uml-viewer.grok :as grok]
+            [uml-viewer.layout :as layout]
             [uml-viewer.source-window :as source-window])
   (:import [java.awt Frame]
            [javax.swing SwingUtilities]
@@ -16,6 +19,167 @@
 
 (defonce !bridge
   (atom {:applet nil :model nil :pick nil :closed? false :exiting false}))
+
+(def standing-rules
+  (str "You are working in the uml-viewer project. The diagram is already on screen.\n"
+       "After every change to Clojure source or the policy, always:\n"
+       "1. Edit examples/uml-viewer.policy.edn only if layering, diagrams, or\n"
+       "   association-vs-dependency changed. Do not edit examples/uml-viewer.edn.\n"
+       "   Policy describes the real dependency structure of the source. Do\n"
+       "   not re-home a namespace in the policy to create a partition the\n"
+       "   code does not have. If a layer is wrong, change the requires (or\n"
+       "   the ns), then update the policy to match.\n"
+       "2. Run clj -M:crap.\n"
+       "3. Run clj -M:mutate on each changed file under src/ (differential:\n"
+       "   snapshots skip unchanged forms). Uncovered mutants are coverage\n"
+       "   gaps, not a failed run: keep the snapshot and do not re-run the\n"
+       "   file, drop differential, or pass --mutate-all because of them.\n"
+       "4. Run clj -M:ir so the viewer reloads topology and the new .metrics/.\n"
+       "Do not start the viewer; it reloads when the EDN mtime changes.\n"
+       "Do not commit or push unless asked.\n"))
+
+(defn grok-executable
+  []
+  (let [home (System/getenv "HOME")
+        named (System/getenv "GROK_BIN")
+        candidates (filter identity
+                           [named
+                            (when home (str home "/.grok/bin/grok"))
+                            "/usr/local/bin/grok"
+                            "/opt/homebrew/bin/grok"])]
+    (or (first (filter (fn [p]
+                         (let [f (io/file p)]
+                           (and (.isFile f) (.canExecute f))))
+                       candidates))
+        "grok")))
+
+(def session-name "uml-viewer-grok")
+
+(defn tmux!
+  "Run tmux with `args`. Returns the process exit code (1 if tmux is missing)."
+  [& args]
+  (try
+    (let [p (.start (ProcessBuilder. (into-array String (cons "tmux" args))))]
+      (.waitFor p))
+    (catch Exception _ 1)))
+
+(defn rgb-16
+  "Terminal.app AppleScript colors are 16-bit (0–65535)."
+  [[r g b]]
+  [(* (int r) 257) (* (int g) 257) (* (int b) 257)])
+
+(defn- applescript-rgb [c]
+  (let [[r g b] (rgb-16 c)]
+    (str "{" r ", " g ", " b "}")))
+
+(defn new-session-args
+  [cwd]
+  ["new-session" "-d" "-s" session-name "-c" cwd
+   "-e" "GROK_THEME=terminal"
+   "-e" "GROK_TERMINAL_THEME=1"
+   "-e" "COLORTERM=truecolor"
+   (grok-executable) "--yolo" "--trust" "--rules" standing-rules
+   ";" "set-option" "status" "off"])
+
+(defn kill-session-args
+  []
+  ["kill-session" "-t" session-name])
+
+(def terminal-title "Grok")
+
+(defonce !terminal-window-id (atom nil))
+
+(defn attach-command
+  []
+  (str "tmux attach -t " session-name "; exit"))
+
+(defn osascript
+  "AppleScript that opens a Terminal window on `shell-cmd`, painted like the diagram.
+  Raises only that window, not every Terminal window. Returns the new window id."
+  [shell-cmd]
+  (str "tell application \"Terminal\"\n"
+       "launch\n"
+       "set grokTab to do script " (pr-str shell-cmd) "\n"
+       "set background color of grokTab to " (applescript-rgb draw/bg) "\n"
+       "set normal text color of grokTab to " (applescript-rgb draw/ink) "\n"
+       "set bold text color of grokTab to " (applescript-rgb draw/gold) "\n"
+       "set cursor color of grokTab to " (applescript-rgb draw/gold) "\n"
+       "set font name of grokTab to \"Menlo\"\n"
+       "set font size of grokTab to 13\n"
+       "set custom title of grokTab to \"" terminal-title "\"\n"
+       "set title displays custom title of grokTab to true\n"
+       "set title displays device name of grokTab to false\n"
+       "set title displays shell path of grokTab to false\n"
+       "set title displays settings name of grokTab to false\n"
+       "set winID to id of front window\n"
+       "end tell\n"
+       "tell application \"System Events\"\n"
+       "tell process \"Terminal\"\n"
+       "try\n"
+       "perform action \"AXRaise\" of (first window whose name contains \"" terminal-title "\")\n"
+       "end try\n"
+       "end tell\n"
+       "end tell\n"
+       "return winID"))
+
+(defn close-terminal-script
+  "AppleScript that closes the Grok Terminal window. Does not launch Terminal."
+  ([] (close-terminal-script nil))
+  ([win-id]
+   (str "tell application \"System Events\"\n"
+        "if not (exists process \"Terminal\") then return\n"
+        "end tell\n"
+        "tell application \"Terminal\"\n"
+        (when win-id
+          (str "try\n"
+               "close (first window whose id is " win-id ") saving no\n"
+               "end try\n"))
+        "repeat with w in (get windows)\n"
+        "try\n"
+        "if custom title of selected tab of w is \"" terminal-title "\" then\n"
+        "close w saving no\n"
+        "end if\n"
+        "end try\n"
+        "end repeat\n"
+        "end tell")))
+
+(defn run-osascript
+  "Run `script` with osascript. Returns trimmed stdout, or \"\"."
+  [script]
+  (try
+    (let [p (.start (doto (ProcessBuilder. (into-array String ["osascript" "-e" script]))
+                      (.redirectErrorStream true)))
+          out (slurp (.getInputStream p))]
+      (.waitFor p)
+      (str/trim out))
+    (catch Exception _ "")))
+
+(defn close-terminal-window!
+  "Close the Terminal window that attached to the grok session."
+  []
+  (run-osascript (close-terminal-script @!terminal-window-id))
+  (reset! !terminal-window-id nil))
+
+(defn open-in-terminal!
+  "Start grok in tmux session uml-viewer-grok and attach a Terminal window."
+  ([] (open-in-terminal! (System/getProperty "user.dir")))
+  ([cwd]
+   (apply tmux! (kill-session-args))
+   (let [code (apply tmux! (new-session-args cwd))]
+     (when-not (zero? code)
+       (binding [*out* *err*]
+         (println "UML viewer: could not start tmux session" session-name))))
+   (let [script (osascript (attach-command))
+         out (run-osascript script)
+         win-id (re-find #"\d+" out)]
+     (reset! !terminal-window-id win-id)
+     {:script script :session session-name :window-id win-id})))
+
+(defn shutdown-children!
+  "Kill the grok tmux session and close its Terminal window."
+  []
+  (apply tmux! (kill-session-args))
+  (close-terminal-window!))
 
 (defn- live? [applet]
   (boolean
@@ -52,8 +216,16 @@
   (System/exit 0))
 
 (defn- exit-app! []
-  (grok/shutdown-children!)
+  (shutdown-children!)
   (halt-vm!))
+
+(defn- class-title [model]
+  (or (get-in model [:class :name]) "Class"))
+
+(defn- set-card-title! [title]
+  (when-let [native (native-window (:applet @!bridge))]
+    (when (instance? Frame native)
+      (.setTitle ^Frame native (str title)))))
 
 (defn- pin-card! [on?]
   (when-let [ap (:applet @!bridge)]
@@ -150,7 +322,7 @@
 
 (defn- start-detail-window! []
   (let [ap (q/sketch
-             :title "Class"
+             :title (class-title (:model @!bridge))
              :size [detail/width detail/height]
              :setup detail-setup
              :update detail-update
@@ -166,6 +338,7 @@
 
 (defn- ensure-detail-window! [model]
   (swap! !bridge assoc :model model)
+  (set-card-title! (class-title model))
   (when-not (or (live? (:applet @!bridge)) (:starting @!bridge))
     (swap! !bridge assoc :starting true)
     (later!
@@ -181,10 +354,17 @@
   (q/color-mode :rgb)
   (q/smooth)
   (q/text-font (q/create-font "SansSerif" 14 true))
-  (events/load-path path))
+  (document/load-path path))
+
+(defn- view-dims []
+  (let [w (q/width)
+        h (q/height)]
+    {:window-w w
+     :window-h h
+     :view-w (max 0 (- w layout/sidebar-w))}))
 
 (defn update-state [state]
-  (let [state (events/maybe-reload state)
+  (let [state (document/maybe-reload state)
         state (if (take-flag! :closed?)
                 (events/close-detail state)
                 state)
@@ -193,7 +373,8 @@
                 state)]
     (if-let [id (:detail-id state)]
       (when-let [model (detail/model (:scene state) id)]
-        (swap! !bridge assoc :model model))
+        (swap! !bridge assoc :model model)
+        (set-card-title! (class-title model)))
       (close-detail-window!))
     state))
 
@@ -228,9 +409,7 @@
                        (.isShiftDown ^MouseEvent event))
                      (applet-shift?)))]
     (events/on-scroll state event
-                      {:horizontal? shift?
-                       :window-w (q/width)
-                       :window-h (q/height)})))
+                      (assoc (view-dims) :horizontal? shift?))))
 
 (defn- on-main-close [state]
   (close-detail-window!)
@@ -239,6 +418,7 @@
 
 (defn start! [path source-impl]
   (swap! !bridge assoc :source source-impl)
+  (open-in-terminal!)
   (q/sketch
     :title "UML viewer"
     :size [window-width window-height]
@@ -250,7 +430,6 @@
                    (events/on-move state (:x event) (:y event)))
     :mouse-wheel on-main-wheel
     :key-pressed (fn [state event]
-                   (events/on-key state (:key event)
-                                 {:window-w (q/width) :window-h (q/height)}))
+                   (events/on-key state (:key event) (view-dims)))
     :on-close on-main-close
     :middleware [m/fun-mode]))

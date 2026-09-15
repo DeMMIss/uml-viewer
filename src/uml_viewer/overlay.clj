@@ -1,7 +1,8 @@
 (ns uml-viewer.overlay
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [uml-viewer.ir :as ir]))
 
 (defn- read-edn [f]
   (when (and f (.exists (io/file f)))
@@ -130,15 +131,16 @@
                           cs))))
         packages))
 
+(defn- paint-diagram [d metrics]
+  (ir/normalize (update d :packages paint-packages metrics)))
+
 (defn apply-metrics
   [doc metrics]
   (if (and (empty? (:crap metrics)) (empty? (:mutate metrics)))
     doc
     (cond
       (:diagrams doc)
-      (update doc :diagrams
-              (fn [ds]
-                (mapv #(update % :packages paint-packages metrics) ds)))
+      (update doc :diagrams (fn [ds] (mapv #(paint-diagram % metrics) ds)))
       (:packages doc)
-      (update doc :packages paint-packages metrics)
+      (paint-diagram doc metrics)
       :else doc)))
