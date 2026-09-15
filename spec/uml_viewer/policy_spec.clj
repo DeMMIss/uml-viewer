@@ -105,4 +105,11 @@
     (should-throw
       (policy/apply-policy
         (assoc policy :diagrams [{:title "X" :package :nope}])
-        graph))))
+        graph)))
+
+  (it "keeps class :ns so overlay can key metrics on another project"
+    (let [doc (policy/apply-policy policy graph)
+          layers (first (:diagrams doc))
+          ir (first (filter #(= :ir (:id %))
+                            (mapcat :classes (:packages layers))))]
+      (should= "uml-viewer.ir" (:ns ir)))))

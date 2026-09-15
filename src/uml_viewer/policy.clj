@@ -105,6 +105,7 @@
 
 (defn- ir-class [c hide?]
   (cond-> {:id (:id c) :name (:name c)}
+    (:ns c) (assoc :ns (:ns c))
     (:stereotype c) (assoc :stereotype (:stereotype c))
     (:foreign c) (assoc :shape :oval)
     (and hide? (not (:foreign c))) (assoc :hide-members true)))

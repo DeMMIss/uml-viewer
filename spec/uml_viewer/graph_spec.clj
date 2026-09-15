@@ -64,6 +64,19 @@
         (should (contains? edges [:a :javax.swing]))
         (should (contains? edges [:a :java.io])))))
 
+  (it "scans cljs namespaces alongside clj and cljc"
+    (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                       (str "uml-graph-cljs-" (System/nanoTime)))]
+      (spit-ns dir "demo/web.cljs"
+               "(ns demo.web (:require [demo.a :as a] [quil.core :as q]))")
+      (spit-ns dir "demo/a.cljc" "(ns demo.a)")
+      (let [g (graph/scan (graph/lookup :clojure) dir {:prefix "demo"})
+            by-id (into {} (map (juxt :id identity) (:classes g)))
+            edges (set (map (juxt :from :to) (:edges g)))]
+        (should= "demo.web" (:ns (by-id :web)))
+        (should (contains? edges [:web :a]))
+        (should (contains? edges [:web :quil.core])))))
+
   (it "names nested namespaces like source.clojure"
     (let [dir (io/file (System/getProperty "java.io.tmpdir")
                        (str "uml-graph-nest-" (System/nanoTime)))]

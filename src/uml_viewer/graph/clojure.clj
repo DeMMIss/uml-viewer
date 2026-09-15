@@ -8,7 +8,7 @@
 (defn- source-files [root]
   (->> (file-seq (io/file root))
        (filter #(.isFile %))
-       (filter #(re-find #"\.cljc?$" (.getName %)))
+       (filter #(re-find #"\.clj[cs]?$" (.getName %)))
        (sort-by #(.getPath %))))
 
 (defn- read-forms [file]
