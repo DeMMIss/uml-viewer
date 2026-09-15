@@ -20,6 +20,13 @@
       (should (> h2 h1)))))
 
 (describe "curve"
+  (it "bounds a cubic by its control hull, not just the polyline"
+    (let [path {:start [0.0 0.0]
+                :ops [{:op :cubic :c1 [-80.0 10.0] :c2 [-80.0 70.0] :p [0.0 80.0]}]}
+          b (curve/path-bounds path)]
+      (should (<= (:x b) -80.0))
+      (should (>= (geom/right b) 0.0))))
+
   (it "chamfers elbows so the spline does not pass through the raw corner"
     (let [rounded (curve/round-corners [[0 0] [0 80] [80 80]] 24)]
       (should= [0.0 0.0] (mapv double (first rounded)))

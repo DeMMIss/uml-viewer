@@ -38,33 +38,51 @@
                                   (mapv (fn [[x y]] [(+ x dx) (+ y dy)]) pts))))
                       es)))))
 
-(defn- edge-sample-rects [e]
+(defn- drawn-path [scene e]
   (let [pts (vec (:points e))]
     (when (next pts)
-      (let [samples (try
-                      (curve/flatten-path (curve/basis-path pts))
-                      (catch Exception _ pts))]
-        (map (fn [[x y]] (geom/rect x y 0 0))
-             (concat pts samples))))))
+      (let [from (first (filter #(= (:from e) (:id %)) (:classes scene)))
+            to (first (filter #(= (:to e) (:id %)) (:classes scene)))]
+        (curve/constrain-ends (curve/basis-path pts)
+                              (:rect from) (:rect to))))))
+
+(defn- edge-bounds [scene e]
+  (when-let [path (drawn-path scene e)]
+    (curve/path-bounds path)))
 
 (defn- content-rects [scene]
   (concat (keep :rect (:packages scene))
           (keep :rect (:classes scene))
-          (mapcat edge-sample-rects (:edges scene))))
+          (keep #(edge-bounds scene %) (:edges scene))))
+
+(defn- inflate [r pad]
+  (geom/rect (- (:x r) pad)
+             (- (:y r) pad)
+             (+ (:w r) (* 2 pad))
+             (+ (:h r) (* 2 pad))))
+
+(defn- bounds-of [scene]
+  (or (some-> (geom/union (content-rects scene))
+              (inflate layout/head-size))
+      (geom/rect 0 0 400 300)))
+
+(defn- with-size [scene]
+  (let [b (bounds-of scene)]
+    (assoc scene :size {:w (+ (geom/right b) layout/margin)
+                        :h (+ (geom/bottom b) layout/margin)
+                        :min-x (min 0.0 (- (:x b) layout/margin))
+                        :min-y (min 0.0 (- (:y b) layout/margin))})))
 
 (defn- fit-scene
   "Shift and size the scene so routed edges that swing past the boxes stay on canvas."
   [scene]
-  (let [bounds (or (geom/union (content-rects scene))
-                   (geom/rect 0 0 400 300))
-        dx (max 0 (- layout/margin (:x bounds)))
-        dy (max 0 (- layout/margin (:y bounds)))
+  (let [b (bounds-of scene)
+        dx (max 0 (- layout/margin (:x b)))
+        dy (max 0 (- layout/margin (:y b)))
         scene (if (and (zero? dx) (zero? dy))
                 scene
-                (translate scene dx dy))
-        bounds (or (geom/union (content-rects scene)) bounds)]
-    (assoc scene :size {:w (+ (geom/right bounds) layout/margin)
-                        :h (+ (geom/bottom bounds) layout/margin)})))
+                (translate scene dx dy))]
+    (with-size scene)))
 
 (defn compile-diagram [diagram]
   (fit-scene (route/route (layout/layout diagram))))
@@ -87,12 +105,22 @@
               [(+ y title-h (get-in s [:size :h]) gap)
                (conj acc (assoc s' :title-y y))]))
           [24 []]
-          raw)]
+          raw)
+        stacked {:packages (vec (mapcat :packages sections))
+                 :classes (vec (mapcat :classes sections))
+                 :edges (vec (mapcat :edges sections))}
+        b (bounds-of stacked)
+        dx (max 0 (- layout/margin (:x b)))
+        sections (if (zero? dx)
+                   sections
+                   (mapv #(translate % dx 0) sections))
+        fitted (with-size (if (zero? dx)
+                            stacked
+                            (translate stacked dx 0)))]
     {:title (:title doc)
      :sections sections
-     :classes (vec (mapcat :classes sections))
-     :packages (vec (mapcat :packages sections))
-     :edges (vec (mapcat :edges sections))
+     :classes (:classes fitted)
+     :packages (:packages fitted)
+     :edges (:edges fitted)
      :diagram {:title (:title doc)}
-     :size {:w (+ layout/margin (apply max 400 (map #(get-in % [:size :w]) sections)))
-            :h total-h}}))
+     :size (assoc (:size fitted) :h total-h)}))

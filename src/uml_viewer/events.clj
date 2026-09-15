@@ -38,11 +38,13 @@
                  (map? amount) (or (:count amount) 0)
                  :else 0)
         size (get-in state [:scene :size] {:w 800 :h 600})
-        max-x (max 0 (- (:w size) view-w))
-        max-y (max 0 (- (:h size) window-h))]
+        min-x (or (:min-x size) 0)
+        min-y (or (:min-y size) 0)
+        max-x (max min-x (- (:w size) view-w))
+        max-y (max min-y (- (:h size) window-h))]
     (if horizontal?
-      (update state :cam-x #(max 0 (min max-x (+ % (* amount 48)))))
-      (update state :cam-y #(max 0 (min max-y (+ % (* amount 48))))))))
+      (update state :cam-x #(max min-x (min max-x (+ % (* amount 48)))))
+      (update state :cam-y #(max min-y (min max-y (+ % (* amount 48))))))))
 
 (defn on-key
   ([state k] (on-key state k {:window-w 1500 :window-h 900}))

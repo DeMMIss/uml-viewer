@@ -65,6 +65,12 @@
       (should= 0 (:cam-x (events/on-key (assoc s :cam-x 10) :left)))
       (should= 0 (:cam-y (events/on-key (assoc s :cam-y 10) :up)))))
 
+  (it "pans left far enough to reach content past the origin"
+    (let [s (assoc (state) :scene {:size {:h 800 :w 1400 :min-x -400}})
+          next (events/on-scroll s -100 {:horizontal? true :window-w 1500
+                                        :window-h 800 :view-w 1220})]
+      (should= -400 (:cam-x next))))
+
   (it "clears selection on escape and ignores other keys"
     (let [s (assoc (state) :selected {:kind :class :id :a} :detail-id :a)
           next (events/on-key s :esc)]

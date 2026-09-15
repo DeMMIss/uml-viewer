@@ -96,7 +96,8 @@
           xs (mapcat #(map first (:points %)) (:edges fitted))]
       (should (<= layout/margin (apply min xs)))
       (should (<= (apply max xs) (get-in fitted [:size :w])))
-      (should (< 40 (get-in fitted [:classes 0 :rect :x])))))
+      (should (< 40 (get-in fitted [:classes 0 :rect :x])))
+      (should (>= 0.0 (get-in fitted [:size :min-x] 0)))))
 
   (it "stacks diagrams top to bottom"
     (let [d {:packages [{:id :p :label "P" :classes [{:id :a :name "A"}]}] :edges []}

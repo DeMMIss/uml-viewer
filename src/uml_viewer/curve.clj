@@ -206,6 +206,24 @@
     [(+ (* a x0) (* b x1) (* c x2) (* d x3))
      (+ (* a y0) (* b y1) (* c y2) (* d y3))]))
 
+(defn path-bounds
+  "Axis-aligned box containing the spline (convex hull of Bezier controls)."
+  [{:keys [start ops]}]
+  (let [pts (into [start]
+                  (mapcat (fn [op]
+                            (if (= :cubic (:op op))
+                              [(:c1 op) (:c2 op) (:p op)]
+                              (when-let [p (:p op)] [p])))
+                          ops))]
+    (when (seq pts)
+      (let [xs (map first pts)
+            ys (map second pts)
+            x0 (apply min xs)
+            y0 (apply min ys)]
+        (geom/rect x0 y0
+                   (- (apply max xs) x0)
+                   (- (apply max ys) y0))))))
+
 (defn flatten-path
   "Sample `path` into a polyline. `step` is the cubic parameter increment."
   ([path] (flatten-path path 0.0625))
