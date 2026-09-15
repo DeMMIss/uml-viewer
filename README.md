@@ -36,7 +36,7 @@ an empty window with the error in the inspector, instead of throwing.
 - Double-click a class to open (or retarget) a **class card**. That click
   brings the card in front. Click empty space on the diagram to bring the
   diagram in front. The two windows are otherwise independent.
-- Hover a member on the class card to highlight it. Double-click it to open
+- Hover a member on the class card to highlight it. Click it to open
   an independent source window (syntax-colored HTML, same style as arch-view).
   See [Source extractors](#source-extractors).
 - Click a package to inspect it in the sidebar.
@@ -224,7 +224,7 @@ Layout follows Mermaid's three stages:
 
 ## Source extractors
 
-Double-clicking a member asks `uml-viewer.source` for the **whole file** and a
+Clicking a member asks `uml-viewer.source` for the **whole file** and a
 **start line**. The IR (and the class card) only supply an **identity
 map**; a language-specific extractor turns that into
 `{:title :file :body :line}`. The source window opens on that file and

@@ -129,8 +129,7 @@
     (let [y (+ (:y event) (:scroll state 0))
           rows (detail/rows model)]
       (if-let [op (detail/member-at rows y)]
-        (when (>= (click-count event) 2)
-          (source-window/open-member-window! (:source @!bridge) (:ns model) op))
+        (source-window/open-member-window! (:source @!bridge) (:ns model) op)
         (when-let [id (detail/rel-at rows y)]
           (swap! !bridge assoc :pick id)))))
   state)

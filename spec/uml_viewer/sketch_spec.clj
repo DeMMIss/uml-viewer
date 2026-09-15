@@ -235,7 +235,7 @@
       (should-be-nil (:hover (call 'detail-mouse-moved {:scroll 0} {:y 0})))
       (should= {:hover nil} (call 'detail-mouse-exited {:hover :go} :evt))))
 
-  (it "opens source on double-click of a member and picks a related class"
+  (it "opens source on click of a member and picks a related class"
     (let [model (a-model)
           rows (detail/rows model)
           go (first (filter :op-name rows))
@@ -247,10 +247,6 @@
       (with-redefs [source-window/open-member-window! (fn [_src ns op]
                                                         (reset! opened [ns op]))]
         (call 'detail-mouse-pressed {:scroll 0} {:y go-y})
-        (should-be-nil @opened)
-        (call 'detail-mouse-pressed {:scroll 0} {:y go-y :count 1})
-        (should-be-nil @opened)
-        (call 'detail-mouse-pressed {:scroll 0} {:y go-y :count 2})
         (should= [(:ns model) "go"] @opened)
         (call 'detail-mouse-pressed {:scroll 0} {:y (+ (:y rel) 1)})
         (should= (:id rel) (:pick @sketch/!bridge))

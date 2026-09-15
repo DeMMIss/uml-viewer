@@ -72,10 +72,10 @@
 
 (defn osascript
   "AppleScript that opens a Terminal window on `shell-cmd`, painted like the diagram.
-  Returns the new window id."
+  Raises only that window, not every Terminal window. Returns the new window id."
   [shell-cmd]
   (str "tell application \"Terminal\"\n"
-       "activate\n"
+       "launch\n"
        "set grokTab to do script " (pr-str shell-cmd) "\n"
        "set background color of grokTab to " (applescript-rgb theme/bg) "\n"
        "set normal text color of grokTab to " (applescript-rgb theme/ink) "\n"
@@ -88,8 +88,16 @@
        "set title displays device name of grokTab to false\n"
        "set title displays shell path of grokTab to false\n"
        "set title displays settings name of grokTab to false\n"
-       "return id of front window\n"
-       "end tell"))
+       "set winID to id of front window\n"
+       "end tell\n"
+       "tell application \"System Events\"\n"
+       "tell process \"Terminal\"\n"
+       "try\n"
+       "perform action \"AXRaise\" of (first window whose name contains \"" terminal-title "\")\n"
+       "end try\n"
+       "end tell\n"
+       "end tell\n"
+       "return winID"))
 
 (defn close-terminal-script
   "AppleScript that closes the Grok Terminal window. Does not launch Terminal."
