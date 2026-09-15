@@ -71,6 +71,14 @@
       (should= 4 (:killed op))
       (should= 1 (:survived op))))
 
+  (it "keeps class :ns so overlay can key any project's snapshots"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :board :name "Board" :ns "demo.board"}]}]
+               :edges []})]
+      (should= "demo.board" (get-in d [:packages 0 :classes 0 :ns]))))
+
   (it "keeps :private on an op"
     (let [d (ir/normalize
               {:packages

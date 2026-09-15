@@ -63,18 +63,19 @@
   (let [name (or (:name c) (some-> (:id c) name))]
     (when-not name
       (throw (ex-info "class needs :name or :id" {:class c})))
-    {:id (as-id (or (:id c) name))
-     :name name
-     :shape (when (or (:foreign c) (= :oval (keyword (:shape c)))) :oval)
-     :stereotype (:stereotype c)
-     :crap (as-crap (:crap c))
-     :coverage (as-coverage (:coverage c))
-     :cc (as-cc (:cc c))
-     :killed (as-count (:killed c))
-     :survived (as-count (:survived c))
-     :hide-members (boolean (:hide-members c))
-     :fields (mapv as-member (:fields c))
-     :ops (mapv as-member (:ops c))}))
+    (cond-> {:id (as-id (or (:id c) name))
+             :name name
+             :shape (when (or (:foreign c) (= :oval (keyword (:shape c)))) :oval)
+             :stereotype (:stereotype c)
+             :crap (as-crap (:crap c))
+             :coverage (as-coverage (:coverage c))
+             :cc (as-cc (:cc c))
+             :killed (as-count (:killed c))
+             :survived (as-count (:survived c))
+             :hide-members (boolean (:hide-members c))
+             :fields (mapv as-member (:fields c))
+             :ops (mapv as-member (:ops c))}
+      (:ns c) (assoc :ns (str (:ns c))))))
 
 (defn- as-package [p]
   (let [label (or (:label p) (some-> (:id p) name))]

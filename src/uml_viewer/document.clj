@@ -4,8 +4,11 @@
             [uml-viewer.ir :as ir]
             [uml-viewer.overlay :as overlay]))
 
-(defn compile-document [doc]
-  (compose/compile-document (overlay/apply-metrics doc (overlay/load-metrics))))
+(defn compile-document
+  ([doc] (compile-document doc (System/getProperty "user.dir")))
+  ([doc metrics-root]
+   (compose/compile-document
+     (overlay/apply-metrics doc (overlay/load-metrics metrics-root)))))
 
 (def empty-scene
   {:classes []
@@ -39,7 +42,8 @@
       (try
         {:path path
          :mtime (.lastModified file)
-         :scene (compile-document (ir/load-document path))
+         :scene (compile-document (ir/load-document path)
+                                  (overlay/metrics-root path))
          :selected nil
          :hover nil
          :detail-id nil
@@ -61,7 +65,8 @@
       (try
         (-> state
             (assoc :mtime mtime
-                   :scene (compile-document (ir/load-document (:path state)))
+                   :scene (compile-document (ir/load-document (:path state))
+                                            (overlay/metrics-root (:path state)))
                    :error nil)
             drop-missing-detail)
         (catch Exception e

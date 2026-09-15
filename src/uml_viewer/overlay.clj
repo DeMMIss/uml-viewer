@@ -40,6 +40,20 @@
           {}
           (or (mutate-files root) [])))
 
+(defn metrics-root
+  "Directory that contains `.metrics`, walking up from `path` (file or dir).
+  Falls back to user.dir when none is found."
+  [path]
+  (loop [dir (let [f (io/file path)]
+               (cond
+                 (nil? path) (io/file (System/getProperty "user.dir"))
+                 (.isFile f) (.getParentFile (.getCanonicalFile f))
+                 :else (.getCanonicalFile f)))]
+    (cond
+      (nil? dir) (System/getProperty "user.dir")
+      (.isDirectory (io/file dir ".metrics")) (.getPath dir)
+      :else (recur (.getParentFile dir)))))
+
 (defn load-metrics
   ([] (load-metrics (System/getProperty "user.dir")))
   ([root]
@@ -63,12 +77,10 @@
               (:forms snapshot))))
 
 (defn class-namespace
-  "Project namespace for a class: `:ns`, or `uml-viewer.<id>`."
+  "Snapshot namespace for a class: authored or generated `:ns`."
   [c]
-  (or (:ns c)
-      (let [id (name (:id c))
-            id (if-let [m (re-find #"^d\d+-(.+)$" id)] (second m) id)]
-        (str "uml-viewer." id))))
+  (when-let [ns-name (:ns c)]
+    (str ns-name)))
 
 (defn- pct->ratio [cov]
   (when (number? cov)

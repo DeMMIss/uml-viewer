@@ -7,47 +7,73 @@
    [{:id :main,
      :label "Main",
      :classes
-     [{:id :main.uml-viewer, :name "MainUmlViewer", :hide-members true}
-      {:id :main.ir-generator, :name "MainIrGenerator", :hide-members true}]}
+     [{:id :main.uml-viewer,
+       :name "MainUmlViewer",
+       :ns "uml-viewer.main.uml-viewer",
+       :hide-members true}
+      {:id :main.ir-generator,
+       :name "MainIrGenerator",
+       :ns "uml-viewer.main.ir-generator",
+       :hide-members true}]}
     {:id :adapters,
      :label "Adapters",
      :classes
-     [{:id :draw, :name "Draw", :hide-members true}
-      {:id :sketch, :name "Sketch", :hide-members true}
-      {:id :core, :name "Core", :hide-members true}
-      {:id :source-window, :name "SourceWindow", :hide-members true}
-      {:id :ir-generator, :name "IrGenerator", :hide-members true}]}
+     [{:id :draw, :name "Draw", :ns "uml-viewer.draw", :hide-members true}
+      {:id :sketch, :name "Sketch", :ns "uml-viewer.sketch", :hide-members true}
+      {:id :core, :name "Core", :ns "uml-viewer.core", :hide-members true}
+      {:id :source-window,
+       :name "SourceWindow",
+       :ns "uml-viewer.source-window",
+       :hide-members true}
+      {:id :ir-generator,
+       :name "IrGenerator",
+       :ns "uml-viewer.ir-generator",
+       :hide-members true}]}
     {:id :app,
      :label "Application",
      :classes
-     [{:id :events, :name "Events", :hide-members true}
-      {:id :document, :name "Document", :hide-members true}
-      {:id :detail, :name "Detail", :hide-members true}
-      {:id :overlay, :name "Overlay", :hide-members true}]}
+     [{:id :events, :name "Events", :ns "uml-viewer.events", :hide-members true}
+      {:id :document, :name "Document", :ns "uml-viewer.document", :hide-members true}
+      {:id :detail, :name "Detail", :ns "uml-viewer.detail", :hide-members true}
+      {:id :overlay, :name "Overlay", :ns "uml-viewer.overlay", :hide-members true}]}
     {:id :engine,
      :label "Engine",
      :classes
-     [{:id :layout, :name "Layout", :hide-members true}
-      {:id :route, :name "Route", :hide-members true}
-      {:id :curve, :name "Curve", :hide-members true}
-      {:id :compose, :name "Compose", :hide-members true}
-      {:id :hit, :name "Hit", :hide-members true}]}
+     [{:id :layout, :name "Layout", :ns "uml-viewer.layout", :hide-members true}
+      {:id :route, :name "Route", :ns "uml-viewer.route", :hide-members true}
+      {:id :curve, :name "Curve", :ns "uml-viewer.curve", :hide-members true}
+      {:id :compose, :name "Compose", :ns "uml-viewer.compose", :hide-members true}
+      {:id :hit, :name "Hit", :ns "uml-viewer.hit", :hide-members true}]}
     {:id :source-factory,
      :label "SourceFactory",
      :classes
-     [{:id :source.clojure, :name "SourceClojure", :hide-members true}
-      {:id :graph.clojure, :name "GraphClojure", :hide-members true}]}
+     [{:id :source.clojure,
+       :name "SourceClojure",
+       :ns "uml-viewer.source.clojure",
+       :hide-members true}
+      {:id :graph.clojure,
+       :name "GraphClojure",
+       :ns "uml-viewer.graph.clojure",
+       :hide-members true}]}
     {:id :language-implementation,
      :label "LanguageImplementation",
      :classes
-     [{:id :graph, :name "Graph", :stereotype :interface, :hide-members true}
-      {:id :source, :name "Source", :stereotype :interface, :hide-members true}]}
+     [{:id :graph,
+       :name "Graph",
+       :ns "uml-viewer.graph",
+       :stereotype :interface,
+       :hide-members true}
+      {:id :source,
+       :name "Source",
+       :ns "uml-viewer.source",
+       :stereotype :interface,
+       :hide-members true}]}
     {:id :domain,
      :label "Domain",
      :classes
-     [{:id :ir, :name "Ir", :hide-members true}
-      {:id :geom, :name "Geom", :hide-members true}
-      {:id :policy, :name "Policy", :hide-members true}]}],
+     [{:id :ir, :name "Ir", :ns "uml-viewer.ir", :hide-members true}
+      {:id :geom, :name "Geom", :ns "uml-viewer.geom", :hide-members true}
+      {:id :policy, :name "Policy", :ns "uml-viewer.policy", :hide-members true}]}],
    :edges
    [{:from :events, :to :hit, :kind :dependency}
     {:from :sketch, :to :source-window, :kind :dependency}
@@ -102,12 +128,23 @@
    [{:id :main,
      :label "Main",
      :classes
-     [{:id :main.uml-viewer, :name "MainUmlViewer"}
-      {:id :main.ir-generator, :name "MainIrGenerator"}
-      {:id :core, :name "Core", :hide-members true}
-      {:id :graph.clojure, :name "GraphClojure", :hide-members true}
-      {:id :ir-generator, :name "IrGenerator", :hide-members true}
-      {:id :source.clojure, :name "SourceClojure", :hide-members true}]}],
+     [{:id :main.uml-viewer, :name "MainUmlViewer", :ns "uml-viewer.main.uml-viewer"}
+      {:id :main.ir-generator,
+       :name "MainIrGenerator",
+       :ns "uml-viewer.main.ir-generator"}
+      {:id :core, :name "Core", :ns "uml-viewer.core", :hide-members true}
+      {:id :graph.clojure,
+       :name "GraphClojure",
+       :ns "uml-viewer.graph.clojure",
+       :hide-members true}
+      {:id :ir-generator,
+       :name "IrGenerator",
+       :ns "uml-viewer.ir-generator",
+       :hide-members true}
+      {:id :source.clojure,
+       :name "SourceClojure",
+       :ns "uml-viewer.source.clojure",
+       :hide-members true}]}],
    :edges
    [{:from :main.uml-viewer, :to :core, :kind :association}
     {:from :main.ir-generator, :to :graph.clojure, :kind :association}
@@ -119,21 +156,29 @@
    [{:id :adapters,
      :label "Adapters",
      :classes
-     [{:id :draw, :name "Draw"}
-      {:id :sketch, :name "Sketch"}
-      {:id :core, :name "Core"}
-      {:id :source-window, :name "SourceWindow"}
-      {:id :ir-generator, :name "IrGenerator"}
-      {:id :layout, :name "Layout", :hide-members true}
-      {:id :curve, :name "Curve", :hide-members true}
-      {:id :geom, :name "Geom", :hide-members true}
-      {:id :hit, :name "Hit", :hide-members true}
-      {:id :detail, :name "Detail", :hide-members true}
-      {:id :document, :name "Document", :hide-members true}
-      {:id :events, :name "Events", :hide-members true}
-      {:id :policy, :name "Policy", :hide-members true}
-      {:id :source, :name "Source", :stereotype :interface, :hide-members true}
-      {:id :graph, :name "Graph", :stereotype :interface, :hide-members true}]}],
+     [{:id :draw, :name "Draw", :ns "uml-viewer.draw"}
+      {:id :sketch, :name "Sketch", :ns "uml-viewer.sketch"}
+      {:id :core, :name "Core", :ns "uml-viewer.core"}
+      {:id :source-window, :name "SourceWindow", :ns "uml-viewer.source-window"}
+      {:id :ir-generator, :name "IrGenerator", :ns "uml-viewer.ir-generator"}
+      {:id :layout, :name "Layout", :ns "uml-viewer.layout", :hide-members true}
+      {:id :curve, :name "Curve", :ns "uml-viewer.curve", :hide-members true}
+      {:id :geom, :name "Geom", :ns "uml-viewer.geom", :hide-members true}
+      {:id :hit, :name "Hit", :ns "uml-viewer.hit", :hide-members true}
+      {:id :detail, :name "Detail", :ns "uml-viewer.detail", :hide-members true}
+      {:id :document, :name "Document", :ns "uml-viewer.document", :hide-members true}
+      {:id :events, :name "Events", :ns "uml-viewer.events", :hide-members true}
+      {:id :policy, :name "Policy", :ns "uml-viewer.policy", :hide-members true}
+      {:id :source,
+       :name "Source",
+       :ns "uml-viewer.source",
+       :stereotype :interface,
+       :hide-members true}
+      {:id :graph,
+       :name "Graph",
+       :ns "uml-viewer.graph",
+       :stereotype :interface,
+       :hide-members true}]}],
    :edges
    [{:from :sketch, :to :source-window, :kind :dependency}
     {:from :draw, :to :layout, :kind :dependency}
@@ -164,14 +209,14 @@
    [{:id :app,
      :label "Application",
      :classes
-     [{:id :events, :name "Events"}
-      {:id :document, :name "Document"}
-      {:id :detail, :name "Detail"}
-      {:id :overlay, :name "Overlay"}
-      {:id :hit, :name "Hit", :hide-members true}
-      {:id :ir, :name "Ir", :hide-members true}
-      {:id :layout, :name "Layout", :hide-members true}
-      {:id :compose, :name "Compose", :hide-members true}]}],
+     [{:id :events, :name "Events", :ns "uml-viewer.events"}
+      {:id :document, :name "Document", :ns "uml-viewer.document"}
+      {:id :detail, :name "Detail", :ns "uml-viewer.detail"}
+      {:id :overlay, :name "Overlay", :ns "uml-viewer.overlay"}
+      {:id :hit, :name "Hit", :ns "uml-viewer.hit", :hide-members true}
+      {:id :ir, :name "Ir", :ns "uml-viewer.ir", :hide-members true}
+      {:id :layout, :name "Layout", :ns "uml-viewer.layout", :hide-members true}
+      {:id :compose, :name "Compose", :ns "uml-viewer.compose", :hide-members true}]}],
    :edges
    [{:from :events, :to :hit, :kind :dependency}
     {:from :events, :to :detail, :kind :dependency}
@@ -189,12 +234,12 @@
    [{:id :engine,
      :label "Engine",
      :classes
-     [{:id :layout, :name "Layout"}
-      {:id :route, :name "Route"}
-      {:id :curve, :name "Curve"}
-      {:id :compose, :name "Compose"}
-      {:id :hit, :name "Hit"}
-      {:id :geom, :name "Geom", :hide-members true}]}],
+     [{:id :layout, :name "Layout", :ns "uml-viewer.layout"}
+      {:id :route, :name "Route", :ns "uml-viewer.route"}
+      {:id :curve, :name "Curve", :ns "uml-viewer.curve"}
+      {:id :compose, :name "Compose", :ns "uml-viewer.compose"}
+      {:id :hit, :name "Hit", :ns "uml-viewer.hit"}
+      {:id :geom, :name "Geom", :ns "uml-viewer.geom", :hide-members true}]}],
    :edges
    [{:from :compose, :to :geom, :kind :dependency}
     {:from :hit, :to :geom, :kind :dependency}
@@ -210,10 +255,18 @@
    [{:id :source-factory,
      :label "SourceFactory",
      :classes
-     [{:id :source.clojure, :name "SourceClojure"}
-      {:id :graph.clojure, :name "GraphClojure"}
-      {:id :graph, :name "Graph", :stereotype :interface, :hide-members true}
-      {:id :source, :name "Source", :stereotype :interface, :hide-members true}]}],
+     [{:id :source.clojure, :name "SourceClojure", :ns "uml-viewer.source.clojure"}
+      {:id :graph.clojure, :name "GraphClojure", :ns "uml-viewer.graph.clojure"}
+      {:id :graph,
+       :name "Graph",
+       :ns "uml-viewer.graph",
+       :stereotype :interface,
+       :hide-members true}
+      {:id :source,
+       :name "Source",
+       :ns "uml-viewer.source",
+       :stereotype :interface,
+       :hide-members true}]}],
    :edges
    [{:from :graph.clojure, :to :graph, :kind :implements}
     {:from :source.clojure, :to :source, :kind :implements}]}
@@ -223,8 +276,8 @@
    [{:id :language-implementation,
      :label "LanguageImplementation",
      :classes
-     [{:id :graph, :name "Graph", :stereotype :interface}
-      {:id :source, :name "Source", :stereotype :interface}]}],
+     [{:id :graph, :name "Graph", :ns "uml-viewer.graph", :stereotype :interface}
+      {:id :source, :name "Source", :ns "uml-viewer.source", :stereotype :interface}]}],
    :edges []}
   {:title "Domain",
    :direction :lr,
@@ -232,5 +285,7 @@
    [{:id :domain,
      :label "Domain",
      :classes
-     [{:id :ir, :name "Ir"} {:id :geom, :name "Geom"} {:id :policy, :name "Policy"}]}],
+     [{:id :ir, :name "Ir", :ns "uml-viewer.ir"}
+      {:id :geom, :name "Geom", :ns "uml-viewer.geom"}
+      {:id :policy, :name "Policy", :ns "uml-viewer.policy"}]}],
    :edges []}]}

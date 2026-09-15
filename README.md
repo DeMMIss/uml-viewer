@@ -172,7 +172,9 @@ the overlay fills CC, coverage, CRAP, killed/survived, and any functions found
 in the snapshots (including privates). Authored `:crap` / `:coverage` / `:ops`
 are the fallback when no snapshot exists.
 
-Class `:id` is mapped to namespace `uml-viewer.<id>` (or `:ns` if you set it).
+Overlay keys snapshots by class `:ns` (the real source namespace). The
+generator writes `:ns` from the scanned ns. Hand-written IR must set `:ns`
+the same way; there is no project-specific fallback.
 
 ```edn
 {:title "Lending library"
