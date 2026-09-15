@@ -1,8 +1,11 @@
 (ns uml-viewer.document-spec
   (:require [clojure.java.io :as io]
             [speclj.core :refer :all]
+            [uml-viewer.compose :as compose]
             [uml-viewer.document :as document]
-            [uml-viewer.ir :as ir]))
+            [uml-viewer.geom :as geom]
+            [uml-viewer.ir :as ir]
+            [uml-viewer.layout :as layout]))
 
 (defn state []
   {:scene document/empty-scene
@@ -81,6 +84,19 @@
         (finally
           (doseq [f (reverse (file-seq root))]
             (io/delete-file f true))))))
+
+  (it "shifts a scene so routes that swing left of the boxes stay on canvas"
+    (let [fit (ns-resolve 'uml-viewer.compose 'fit-scene)
+          scene {:packages [{:id :p :rect (geom/rect 40 40 200 80)}]
+                 :classes [{:id :a :rect (geom/rect 50 50 80 40)}]
+                 :edges [{:from :a :to :a
+                          :points [[50 70] [-80 70] [-80 120] [50 120]]}]
+                 :size {:w 280 :h 160}}
+          fitted (fit scene)
+          xs (mapcat #(map first (:points %)) (:edges fitted))]
+      (should (<= layout/margin (apply min xs)))
+      (should (<= (apply max xs) (get-in fitted [:size :w])))
+      (should (< 40 (get-in fitted [:classes 0 :rect :x])))))
 
   (it "stacks diagrams top to bottom"
     (let [d {:packages [{:id :p :label "P" :classes [{:id :a :name "A"}]}] :edges []}

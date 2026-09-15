@@ -2,6 +2,8 @@
   (:require [uml-viewer.geom :as geom]
             [uml-viewer.layout :as layout]))
 
+(declare attach-face)
+
 (defn- class-by-id [scene]
   (into {} (map (juxt :id identity) (:classes scene))))
 
@@ -58,11 +60,51 @@
             (some #(geom/segment-hits-rect? a b (:rect %)) others))
           (partition 2 1 pts))))
 
+(defn- min-turn-dot [pts]
+  (let [pts (vec pts)]
+    (if (< (count pts) 3)
+      1.0
+      (apply min
+             (map (fn [i]
+                    (let [[x0 y0] (nth pts (dec i))
+                          [x1 y1] (nth pts i)
+                          [x2 y2] (nth pts (inc i))
+                          ax (- x1 x0) ay (- y1 y0)
+                          bx (- x2 x1) by (- y2 y1)
+                          la (Math/hypot ax ay)
+                          lb (Math/hypot bx by)]
+                      (if (or (< la 1.0e-9) (< lb 1.0e-9))
+                        1.0
+                        (/ (+ (* ax bx) (* ay by)) (* la lb)))))
+                  (range 1 (dec (count pts))))))))
+
+(defn- stub-ok? [r p other]
+  (if (or (nil? r) (nil? p) (nil? other))
+    true
+    (let [face (attach-face r p)
+          dx (- (first other) (first p))
+          dy (- (second other) (second p))
+          along (if (#{:left :right} face) (abs dy) (abs dx))
+          across (if (#{:left :right} face) (abs dx) (abs dy))]
+      (>= (+ across 1.0) along))))
+
+(defn- path-attach-ok? [pts from-id to-id classes]
+  (let [idx (into {} (map (juxt :id identity) classes))
+        from (idx from-id)
+        to (idx to-id)
+        pts (vec pts)]
+    (and (> (count pts) 1)
+         (stub-ok? (:rect from) (first pts) (nth pts 1))
+         (stub-ok? (:rect to) (last pts) (nth pts (- (count pts) 2))))))
+
 (defn- try-paths [candidates from-id to-id classes]
-  (or (first (filter #(and (seq %)
-                           (not (path-hits? % from-id to-id classes)))
-                     candidates))
-      (first candidates)))
+  (let [clear (filterv #(and (seq %)
+                             (not (path-hits? % from-id to-id classes)))
+                       candidates)
+        ok (filterv #(path-attach-ok? % from-id to-id classes) clear)]
+    (if (seq ok)
+      (apply max-key min-turn-dot ok)
+      (or (first clear) (first candidates)))))
 
 (defn- rank-extent [classes rank lr? side]
   (let [ns (filter #(= rank (:rank % 0)) classes)]
@@ -254,6 +296,17 @@
             px' (max lo-x (min hi-x (max (- ox lim) (min (+ ox lim) px))))]
         [px' py]))))
 
+(def ^:private min-stub 20.0)
+
+(defn- stretch-stub [from to]
+  (let [dx (- (first to) (first from))
+        dy (- (second to) (second from))
+        len (Math/hypot dx dy)]
+    (if (< len 1.0e-9)
+      to
+      (let [s (max 1.0 (/ min-stub len))]
+        [(+ (first from) (* dx s)) (+ (second from) (* dy s))]))))
+
 (defn- sync-stub
   "Keep the first/last inner bend aligned with the attach point so the
    stub leaves the face instead of reversing along it."
@@ -269,12 +322,14 @@
         (let [inner (nth pts 1)
               inner (if along-y?
                       [(first inner) (second p)]
-                      [(first p) (second inner)])]
+                      [(first p) (second inner)])
+              inner (stretch-stub p inner)]
           (-> pts (assoc 0 p) (assoc 1 inner)))
         (let [inner (nth pts (- n 2))
               inner (if along-y?
                       [(first inner) (second p)]
-                      [(first p) (second inner)])]
+                      [(first p) (second inner)])
+              inner (stretch-stub p inner)]
           (-> pts (assoc (dec n) p) (assoc (- n 2) inner)))))))
 
 (defn- constrain-attach [from-r to-r pts]

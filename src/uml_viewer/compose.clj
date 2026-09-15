@@ -1,10 +1,8 @@
 (ns uml-viewer.compose
-  (:require [uml-viewer.geom :as geom]
+  (:require [uml-viewer.curve :as curve]
+            [uml-viewer.geom :as geom]
             [uml-viewer.layout :as layout]
             [uml-viewer.route :as route]))
-
-(defn compile-diagram [diagram]
-  (route/route (layout/layout diagram)))
 
 (defn- qid [idx id]
   (keyword (str "d" idx "-" (name id))))
@@ -40,6 +38,37 @@
                                   (mapv (fn [[x y]] [(+ x dx) (+ y dy)]) pts))))
                       es)))))
 
+(defn- edge-sample-rects [e]
+  (let [pts (vec (:points e))]
+    (when (next pts)
+      (let [samples (try
+                      (curve/flatten-path (curve/basis-path pts))
+                      (catch Exception _ pts))]
+        (map (fn [[x y]] (geom/rect x y 0 0))
+             (concat pts samples))))))
+
+(defn- content-rects [scene]
+  (concat (keep :rect (:packages scene))
+          (keep :rect (:classes scene))
+          (mapcat edge-sample-rects (:edges scene))))
+
+(defn- fit-scene
+  "Shift and size the scene so routed edges that swing past the boxes stay on canvas."
+  [scene]
+  (let [bounds (or (geom/union (content-rects scene))
+                   (geom/rect 0 0 400 300))
+        dx (max 0 (- layout/margin (:x bounds)))
+        dy (max 0 (- layout/margin (:y bounds)))
+        scene (if (and (zero? dx) (zero? dy))
+                scene
+                (translate scene dx dy))
+        bounds (or (geom/union (content-rects scene)) bounds)]
+    (assoc scene :size {:w (+ (geom/right bounds) layout/margin)
+                        :h (+ (geom/bottom bounds) layout/margin)})))
+
+(defn compile-diagram [diagram]
+  (fit-scene (route/route (layout/layout diagram))))
+
 (defn compile-document
   "Layout and route each diagram, then stack them top to bottom."
   [doc]
@@ -47,7 +76,7 @@
         title-h 40
         raw (map-indexed
               (fn [i d]
-                (-> (route/route (layout/layout d))
+                (-> (compile-diagram d)
                     (assoc :title (:title d) :crap (:crap d))
                     (#(qualify i %))))
               (:diagrams doc))

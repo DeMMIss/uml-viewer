@@ -1,6 +1,47 @@
 (ns uml-viewer.curve
   (:require [uml-viewer.geom :as geom]))
 
+(def corner-radius 24.0)
+
+(defn- vsub [[x1 y1] [x2 y2]] [(- x1 x2) (- y1 y2)])
+(defn- vadd [[x1 y1] [x2 y2]] [(+ x1 x2) (+ y1 y2)])
+(defn- vscale [[x y] s] [(* x s) (* y s)])
+(defn- vlen [[x y]] (Math/hypot x y))
+(defn- vnorm [v]
+  (let [l (vlen v)]
+    (if (< l 1.0e-9) [0.0 0.0] [(/ (first v) l) (/ (second v) l)])))
+
+(defn round-corners
+  "Replace each interior elbow with a pair of points inset along the legs
+   so the spline cannot make a tight 90° (or sharper) turn."
+  ([pts] (round-corners pts corner-radius))
+  ([pts radius]
+   (let [pts (vec pts)
+         n (count pts)]
+     (if (< n 3)
+       pts
+       (loop [i 1 out [(first pts)]]
+         (if (>= i (dec n))
+           (conj (vec out) (last pts))
+           (let [prev (nth pts (dec i))
+                 cur (nth pts i)
+                 nxt (nth pts (inc i))
+                 a (vsub cur prev)
+                 b (vsub nxt cur)
+                 la (vlen a)
+                 lb (vlen b)
+                 r (min (double radius) (* 0.45 la) (* 0.45 lb))
+                 na (vnorm a)
+                 nb (vnorm b)
+                 turn (+ (* (first na) (first nb))
+                         (* (second na) (second nb)))]
+             (if (or (< r 4.0) (> turn 0.92))
+               (recur (inc i) (conj out cur))
+               (recur (inc i)
+                      (conj out
+                            (vadd cur (vscale na (- r)))
+                            (vadd cur (vscale nb r))))))))))))
+
 (defn- cubic [x0 y0 x1 y1 x y]
   {:op :cubic
    :c1 [(/ (+ (* 2 x0) x1) 3.0) (/ (+ (* 2 y0) y1) 3.0)]
@@ -43,7 +84,7 @@
 (defn basis-path
   "D3 curveBasis through `pts`. Returns {:start [x y] :ops [...]}."
   [pts]
-  (let [pts (vec pts)
+  (let [pts (vec (round-corners pts))
         n (count pts)]
     (cond
       (zero? n) {:start [0 0] :ops []}

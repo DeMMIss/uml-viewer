@@ -20,6 +20,15 @@
       (should (> h2 h1)))))
 
 (describe "curve"
+  (it "chamfers elbows so the spline does not pass through the raw corner"
+    (let [rounded (curve/round-corners [[0 0] [0 80] [80 80]] 24)]
+      (should= [0.0 0.0] (mapv double (first rounded)))
+      (should= [80.0 80.0] (mapv double (last rounded)))
+      (should-not (some (fn [p] (and (< (abs (- (first p) 0.0)) 0.01)
+                                     (< (abs (- (second p) 80.0)) 0.01)))
+                        (rest (butlast rounded))))
+      (should= 4 (count rounded))))
+
   (it "handles short polylines"
     (should= [] (:ops (curve/basis-path [])))
     (should= [] (:ops (curve/basis-path [[0 0]])))
