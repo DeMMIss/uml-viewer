@@ -73,7 +73,9 @@ Rename or move of a function is a new form: overlay does not match old names.
 - Methods on the card are `+` public and `-` private. `defn-` is not drawn on
   the class box.
 - Abstract classes show a white **α** in the upper-right; interfaces a white
-  **I**. Foreign libraries listed in policy are ovals outside the layers.
+  **I**. Names of rectangles that are not classes (layers, interfaces,
+  enumerations, package banners) are italic. Foreign libraries listed in
+  policy are ovals outside the layers.
 - Scroll to pan vertically; Shift-scroll (or left/right arrows) for
   horizontal. Pan can follow arrows that bow past the origin.
 - **Regen** in the inspector asks the companion to rewrite policy and IR

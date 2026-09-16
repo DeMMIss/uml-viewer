@@ -29,6 +29,8 @@
                   q/text (rec :text)
                   q/text-align (rec :text-align)
                   q/text-size (rec :text-size)
+                  q/text-font (rec :text-font)
+                  q/create-font (fn [& _] :font)
                   q/triangle (rec :triangle)
                   q/quad (rec :quad)
                   q/background (rec :background)
@@ -326,6 +328,13 @@
         (should (painted? log :fill [255 255 255]))
         (should-contain [:text-align :right :top] @log)
         (should-contain [:text "α" 104 24] @log))))
+
+  (it "uses italics for names of non-class rectangles"
+    (should-not (call 'italic-name? (a-class)))
+    (should (call 'italic-name? (assoc (a-class) :stereotype :interface)))
+    (should (call 'italic-name? (assoc (a-class) :stereotype :abstract)))
+    (should (call 'italic-name? (assoc (a-class) :drill? true)))
+    (should (call 'italic-name? (assoc (a-class) :contents [{:id :x :name "X"}]))))
 
   (it "paints a white I in the upper-right of an interface"
     (record-quil

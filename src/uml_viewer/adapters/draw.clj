@@ -6,7 +6,9 @@
             [uml-viewer.application.detail :as detail]
             [uml-viewer.application.document :as document]
             [uml-viewer.engine.hit :as hit]
-            [uml-viewer.engine.layout :as layout]))
+            [uml-viewer.engine.layout :as layout])
+  (:import [java.awt Font]
+           [processing.core PFont]))
 
 (def bg [22 28 32])
 (def panel [26 36 40])
@@ -124,6 +126,27 @@
     (when (and (:head e) (:tip drawn))
       (arrowhead (:head e) (:tip drawn) (:behind drawn)))))
 
+(defn- pfont [italic? size]
+  (try
+    (PFont. (Font. "SansSerif"
+                   (if italic? Font/ITALIC Font/PLAIN)
+                   (int size))
+            true)
+    (catch Exception _ nil)))
+
+(defn- name-font! [italic?]
+  (when-let [f (pfont italic? 14)]
+    (q/text-font f)))
+
+(defn italic-name?
+  "True for layer/group boxes and non-class classifiers (interface, enum, …)."
+  [c]
+  (boolean
+    (or (seq (:contents c))
+        (:drill? c)
+        (let [st (some-> (:stereotype c) name)]
+          (and st (not= "class" st))))))
+
 (defn- draw-package [p selected?]
   (let [r (:rect p)
         crap (:crap p)]
@@ -134,7 +157,9 @@
     (rgb gold)
     (q/text-align :left :center)
     (q/text-size 14)
-    (q/text (:title p) (+ (:x r) layout/pad) (+ (:y r) (/ layout/banner-h 2)))))
+    (name-font! true)
+    (q/text (:title p) (+ (:x r) layout/pad) (+ (:y r) (/ layout/banner-h 2)))
+    (name-font! false)))
 
 (defn- class-line-ink [kind]
   (case kind
@@ -149,12 +174,18 @@
           (- (geom/right r) 6) (+ y 4))
   (+ y layout/pad))
 
-(defn- draw-text-line [r line y]
-  (q/text-align :center :top)
-  (q/text-size (if (= :name (:kind line)) 14 12))
-  (rgb (class-line-ink (:kind line)))
-  (q/text (:text line) (geom/cx r) y)
-  (+ y layout/line-h))
+(defn- draw-text-line
+  ([r line y] (draw-text-line r line y false))
+  ([r line y italic-name?]
+   (q/text-align :center :top)
+   (q/text-size (if (= :name (:kind line)) 14 12))
+   (when (and italic-name? (= :name (:kind line)))
+     (name-font! true))
+   (rgb (class-line-ink (:kind line)))
+   (q/text (:text line) (geom/cx r) y)
+   (when (and italic-name? (= :name (:kind line)))
+     (name-font! false))
+   (+ y layout/line-h)))
 
 (defn- draw-child-wash [r y]
   (q/no-stroke)
@@ -167,13 +198,14 @@
        (= (:id line) (:id mark))))
 
 (defn- draw-class-line
-  ([r crap line y] (draw-class-line r crap line y nil nil))
-  ([r crap line y hover selected]
+  ([r crap line y] (draw-class-line r crap line y nil nil false))
+  ([r crap line y hover selected] (draw-class-line r crap line y hover selected false))
+  ([r crap line y hover selected italic-name?]
    (when (or (highlight-child? line hover) (highlight-child? line selected))
      (draw-child-wash r y))
    (if (= :rule (:kind line))
      (draw-rule r crap y)
-     (draw-text-line r line y))))
+     (draw-text-line r line y italic-name?))))
 
 (defn- port-marked? [p mark]
   (and (= :port (:kind mark))
@@ -252,7 +284,8 @@
                    (if selected? 2.6 1.3))
        (q/rect (:x r) (:y r) (:w r) (:h r) 4)
        (draw-class-ports c hover selected)
-       (reduce (fn [y line] (draw-class-line r crap line y hover selected))
+       (reduce (fn [y line] (draw-class-line r crap line y hover selected
+                                            (italic-name? c)))
                (+ (:y r) layout/pad 4)
                (:lines c))
        (when-let [ch (corner-mark c)]
