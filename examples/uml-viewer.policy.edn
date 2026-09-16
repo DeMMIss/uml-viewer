@@ -3,43 +3,18 @@
  :prefix "uml-viewer"
  :lang :clojure
  :out "examples/uml-viewer.edn"
+ :hierarchical true
  :foreign [quil javax.swing]
- :packages
- [{:id :main
-   :label "Main"
-   :nses [main.uml-viewer main.ir-generator]}
-  {:id :adapters
-   :label "Adapters"
-   :nses [draw sketch core source-window ir-generator]}
-  {:id :app
-   :label "Application"
-   :nses [events document detail overlay]}
-  {:id :engine
-   :label "Engine"
-   :nses [layout route curve compose hit]}
-  {:id :source-factory
-   :label "SourceFactory"
-   :nses [source.clojure graph.clojure]}
-  {:id :language-implementation
-   :label "LanguageImplementation"
-   :nses [graph source]}
-  {:id :domain
-   :label "Domain"
-   :nses [ir geom policy]}]
- :diagrams
- [{:title "Layers" :view :overview :hide-members true :direction :tb}
-  {:title "Main" :package :main
-   :edge-kinds {[:main.uml-viewer :core] :association
-                [:main.uml-viewer :source.clojure] :association
-                [:main.ir-generator :ir-generator] :association
-                [:main.ir-generator :graph.clojure] :association}}
-  {:title "Adapters" :package :adapters
-   :edge-kinds {[:core :sketch] :association}}
-  {:title "Application" :package :app
-   :edge-kinds {[:document :compose] :association}}
-  {:title "Engine" :package :engine
-   :edge-kinds {[:compose :layout] :association
-                [:compose :route] :association}}
-  {:title "SourceFactory" :package :source-factory}
-  {:title "LanguageImplementation" :package :language-implementation}
-  {:title "Domain" :package :domain}]}
+ :order [main adapters application engine source graph clojure-language domain]
+ :edge-kinds {[:engine.compose :engine.layout] :association
+              [:engine.compose :engine.route] :association
+              [:adapters.core :adapters.sketch] :association
+              [:application.document :engine.compose] :association
+              [:application.document :domain.hierarchy] :association
+              [:main :adapters] :association
+              [:main :clojure-language] :association
+              [:main :application] :association
+              [:main.uml-viewer :adapters.core] :association
+              [:main.uml-viewer :clojure-language.source-clojure] :association
+              [:main.ir-generator :application.ir-generator] :association
+              [:main.ir-generator :clojure-language.graph-clojure] :association}}

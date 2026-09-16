@@ -3,6 +3,13 @@
             [clojure.string :as str]
             [speclj.core :refer :all]))
 
+(def layer-rank
+  {:domain 0 :source 0 :graph 0 :clojure-language 0
+   :engine 1
+   :application 2
+   :adapters 3
+   :main 4})
+
 (defn- source-files []
   (->> (file-seq (io/file "src"))
        (filter #(re-matches #".*\.clj[cs]?$" (.getName %)))))
@@ -28,28 +35,23 @@
        (mapcat rest)
        (map required-lib)))
 
+(defn- project-ns? [sym]
+  (let [s (str sym)]
+    (or (= s "uml-viewer")
+        (str/starts-with? s "uml-viewer."))))
+
+(defn- layer-of [ns-name]
+  (let [s (str ns-name)
+        rest (if (str/starts-with? s "uml-viewer.")
+               (subs s (count "uml-viewer."))
+               s)
+        seg (keyword (first (str/split rest #"\.")))]
+    (when (contains? layer-rank seg) seg)))
+
 (defn- quil-lib? [sym]
   (let [s (str sym)]
     (or (= s "quil.core")
         (str/starts-with? s "quil."))))
-
-(defn- quil-adapter? [ns-name]
-  (contains? #{"uml-viewer.draw" "uml-viewer.sketch" "uml-viewer.core"}
-             (str ns-name)))
-
-(defn- logic-ns? [ns-name]
-  (not (quil-adapter? ns-name)))
-
-(defn- clojure-impl-lib? [sym]
-  (contains? #{'uml-viewer.source.clojure 'uml-viewer.graph.clojure} sym))
-
-(defn- adapter-layer? [ns-name]
-  (let [s (str ns-name)]
-    (and (str/starts-with? s "uml-viewer.")
-         (not (str/starts-with? s "uml-viewer.main."))
-         (not (contains? #{"uml-viewer.source.clojure"
-                           "uml-viewer.graph.clojure"}
-                         s)))))
 
 (defn- violations [from-pred to-pred]
   (for [file (source-files)
@@ -61,26 +63,44 @@
     {:ns ns-name :requires lib :file (str file)}))
 
 (describe "architecture"
+  (it "places every project namespace in a named layer"
+    (let [nses (map ns-name-of (map read-ns-form (source-files)))
+          unknown (remove layer-of nses)]
+      (should= [] unknown)))
+
+  (it "keeps inner layers free of outer layers"
+    (should= []
+             (for [file (source-files)
+                   :let [ns-form (read-ns-form file)
+                         ns-name (ns-name-of ns-form)
+                         from (layer-of ns-name)]
+                   :when from
+                   lib (required-libs ns-form)
+                   :when (project-ns? lib)
+                   :let [to (layer-of lib)]
+                   :when (and to (> (layer-rank to) (layer-rank from)))]
+               {:ns ns-name :requires lib :from from :to to})))
+
   (it "keeps layout, IR, and hit-testing free of Quil"
-    (should= [] (violations logic-ns? quil-lib?)))
+    (should= [] (violations #(not (contains? #{:adapters :main} (layer-of %)))
+                            quil-lib?)))
 
   (it "confines Processing to draw and sketch"
     (let [owners (set (map (comp str :ns) (violations (constantly true) quil-lib?)))]
-      (should= #{"uml-viewer.draw" "uml-viewer.sketch"} owners)))
+      (should= #{"uml-viewer.adapters.draw" "uml-viewer.adapters.sketch"} owners)))
 
   (it "keeps source lookup free of Swing and Quil"
-    (should= [] (violations #(contains? #{"uml-viewer.source"
-                                         "uml-viewer.source.clojure"} (str %))
+    (should= [] (violations #(contains? #{:source} (layer-of %))
                             #(or (quil-lib? %)
                                  (#{'javax.swing 'java.awt} %)))))
 
-  (it "keeps the language graph and policy free of Swing and Quil"
-    (should= [] (violations #(contains? #{"uml-viewer.graph"
-                                         "uml-viewer.graph.clojure"
-                                         "uml-viewer.policy"
-                                         "uml-viewer.ir-generator"} (str %))
+  (it "keeps the language graph and domain free of Swing and Quil"
+    (should= [] (violations #(contains? #{:graph :domain} (layer-of %))
                             #(or (quil-lib? %)
                                  (#{'javax.swing 'java.awt} %)))))
 
-  (it "keeps adapters free of clojure implementations"
-    (should= [] (violations adapter-layer? clojure-impl-lib?))))
+  (it "wires clojure implementations only from main"
+    (should= [] (violations #(not= :main (layer-of %))
+                            #(contains? #{'uml-viewer.clojure-language.source-clojure
+                                          'uml-viewer.clojure-language.graph-clojure}
+                                        %)))))

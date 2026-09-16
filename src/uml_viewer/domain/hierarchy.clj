@@ -1,0 +1,223 @@
+(ns uml-viewer.domain.hierarchy
+  "Namespace-tree views: one level of children, collapsed inter-layer edges."
+  (:require [clojure.string :as str]
+            [uml-viewer.domain.policy :as policy]))
+
+(defn- as-id [x]
+  (keyword (name x)))
+
+(defn- segs [id]
+  (str/split (name id) #"\."))
+
+(defn- join-id [parts]
+  (keyword (str/join "." parts)))
+
+(defn- last-seg [id]
+  (keyword (last (segs id))))
+
+(defn- path-names [path]
+  (mapv name path))
+
+(defn- under?
+  "True when `id` is the node at `path` or a descendant of it."
+  [id path]
+  (let [s (segs id)
+        p (path-names path)]
+    (or (and (= (count s) (count p)) (= s p))
+        (= p (vec (take (count p) s))))))
+
+(defn- child-id [id path]
+  (let [s (segs id)
+        n (count path)]
+    (when (under? id path)
+      (if (= (count s) n)
+        id
+        (join-id (take (inc n) s))))))
+
+(defn- node-label [id]
+  (->> (str/split (name (last-seg id)) #"\-")
+       (map str/capitalize)
+       (str/join)))
+
+(defn- has-descendants? [id classes]
+  (let [pfx (str (name id) ".")]
+    (boolean (some #(str/starts-with? (name (:id %)) pfx) classes))))
+
+(defn- index-classes [classes]
+  (into {} (map (juxt :id identity) classes)))
+
+(defn- sort-ids [ids order]
+  (let [rank (into {} (map-indexed (fn [i id] [(as-id id) i]) order))
+        n (count rank)]
+    (vec (sort-by (fn [id] [(get rank id n) (name id)]) ids))))
+
+(defn nodes-at
+  "Immediate child node ids of `path`, including a self-module when it exists."
+  [classes path]
+  (->> classes
+       (remove :foreign)
+       (keep #(child-id (:id %) path))
+       distinct
+       vec))
+
+(defn- contents-of [classes path node-id]
+  (let [next-path (conj (vec path) (last-seg node-id))
+        kids (nodes-at classes next-path)
+        others (remove #(= % node-id) kids)]
+    (when (seq others)
+      (mapv (fn [cid]
+              {:id cid
+               :name (node-label cid)
+               :drill? (and (not= cid node-id)
+                            (has-descendants? cid classes))})
+            kids))))
+
+(defn- crap-risk [crap]
+  (when (:mu crap)
+    (+ (double (:mu crap)) (double (or (:sigma crap) 0)))))
+
+(defn- worse-crap [a b]
+  (let [ra (crap-risk a)
+        rb (crap-risk b)]
+    (cond
+      (nil? ra) b
+      (nil? rb) a
+      (> ra rb) a
+      :else b)))
+
+(defn- rolled-crap
+  "Worst (μ+σ) among `id` and its descendants."
+  [classes id]
+  (let [pfx (str (name id) ".")]
+    (reduce worse-crap nil
+            (keep (fn [c]
+                    (when (or (= id (:id c))
+                              (str/starts-with? (name (:id c)) pfx))
+                      (:crap c)))
+                  classes))))
+
+(defn- view-class [idx classes path id]
+  (let [leaf (get idx id)
+        kids (contents-of classes path id)
+        drill? (boolean (seq kids))
+        hide? drill?
+        crap (rolled-crap classes id)]
+    (cond-> {:id id
+             :name (or (:name leaf) (node-label id))
+             :drill? drill?}
+      (:ns leaf) (assoc :ns (:ns leaf))
+      (:stereotype leaf) (assoc :stereotype (:stereotype leaf))
+      crap (assoc :crap crap)
+      (:coverage leaf) (assoc :coverage (:coverage leaf))
+      (:ops leaf) (assoc :ops (:ops leaf))
+      (:fields leaf) (assoc :fields (:fields leaf))
+      hide? (assoc :hide-members true)
+      (seq kids) (assoc :contents kids))))
+
+(defn- collapse-end [id path idx]
+  (if (:foreign (get idx id))
+    id
+    (child-id id path)))
+
+(defn- external-end [id path idx]
+  (cond
+    (:foreign (get idx id))
+    {:id id :name (or (:name (get idx id)) (name id)) :foreign true}
+
+    (under? id path)
+    nil
+
+    :else
+    (let [ext (join-id (take (max 1 (count path)) (segs id)))]
+      {:id ext :name (node-label ext) :external true})))
+
+(defn- add-port [m box-id dep]
+  (let [cur (get m box-id [])]
+    (if (some #(= (:id dep) (:id %)) cur)
+      m
+      (assoc m box-id (conj cur (select-keys dep [:id :name]))))))
+
+(defn- add-foreign [acc box-id dep e]
+  (let [fid (:id dep)
+        edge (assoc e :from box-id :to fid)
+        seen (some #(= fid (:id %)) (:foreign acc))]
+    (cond-> (update acc :foreign-edges conj edge)
+      (not seen) (update :foreign conj
+                         {:id fid
+                          :name (:name dep)
+                          :foreign true
+                          :shape :oval}))))
+
+(defn- partition-edges
+  "In-view edges stay arrows. Foreign libs are ovals. Other off-view deps are ports."
+  [edges ids path idx]
+  (reduce
+    (fn [acc e]
+      (let [from (collapse-end (:from e) path idx)
+            to-in (collapse-end (:to e) path idx)
+            to-ext (when-not (and to-in (ids to-in))
+                     (external-end (:to e) path idx))
+            from-ext (when-not (and from (ids from))
+                       (external-end (:from e) path idx))
+            from-here? (boolean (and from (ids from)))
+            to-here? (boolean (and to-in (ids to-in)))]
+        (cond
+          (and from-here? to-here? (not= from to-in))
+          (update acc :internal conj (assoc e :from from :to to-in))
+
+          (and from-here? (:foreign to-ext))
+          (add-foreign acc from to-ext e)
+
+          (and from-here? to-ext)
+          (update acc :out add-port from to-ext)
+
+          (and to-here? (:foreign from-ext))
+          (add-foreign acc to-in from-ext (assoc e :from (:id from-ext) :to to-in))
+
+          (and to-here? from-ext)
+          (update acc :in add-port to-in from-ext)
+
+          :else acc)))
+    {:internal [] :in {} :out {} :foreign [] :foreign-edges []}
+    edges))
+
+(defn view-at
+  "One diagram: children of `path` as boxes, edges collapsed to that level."
+  [doc path]
+  (let [path (mapv as-id path)
+        classes (:classes doc)
+        idx (index-classes classes)
+        order (or (get-in doc [:order (str/join "." (map name path))])
+                  (when (empty? path) (:order doc))
+                  [])
+        node-ids (sort-ids (nodes-at classes path) order)
+        boxes (mapv #(view-class idx classes path %) node-ids)
+        ids (set (map :id boxes))
+        kinds (or (:edge-kinds doc) {})
+        omit (or (:omit-edges doc) [])
+        parts (partition-edges (:edges doc) ids path idx)
+        foreign (:foreign parts)
+        foreign-ids (set (map :id foreign))
+        visible (into ids foreign-ids)
+        edges (filterv #(and (visible (:from %)) (visible (:to %)))
+                       (policy/apply-edge-kinds
+                         (policy/merge-edges
+                           (into (:internal parts) (:foreign-edges parts)))
+                         kinds omit))
+        boxes (mapv (fn [c]
+                      (cond-> c
+                        (seq (get-in parts [:in (:id c)]))
+                        (assoc :in-deps (get-in parts [:in (:id c)]))
+                        (seq (get-in parts [:out (:id c)]))
+                        (assoc :out-deps (get-in parts [:out (:id c)]))))
+                    boxes)
+        label (if (seq path)
+                (str/join "." (map name path))
+                (or (:title doc) "UML"))]
+    (cond-> {:title label
+             :direction :tb
+             :packages [{:id :view
+                         :label label
+                         :classes boxes}]
+             :edges (vec edges)}
+      (seq foreign) (assoc :foreign foreign))))

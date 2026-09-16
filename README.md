@@ -20,30 +20,42 @@ clj -M:ir                            # policy → examples/uml-viewer.edn
 clj -M:run
 clj -M:run examples/library.edn
 clj -M:run examples/uml-viewer.edn
+clj -M:run --restart                 # new JVM, same Grok session
+clj -M:run --restart examples/uml-viewer.edn
 ```
 
-A **tmux** session `uml-viewer-grok` starts interactive Grok
-(`--yolo --trust --rules …`) and a Terminal window attaches to it. Type
-there; Esc is the real TUI interrupt. Closing the diagram kills that tmux
-session (and the Terminal attach). That instance — not every Grok in this
-repo — is told to run `clj -M:crap`, `clj -M:mutate` on files it changed,
-then `clj -M:ir` after every change. The viewer reloads the generated EDN
-(and overlay). Project-wide rules live in `.grok/rules/uml-viewer.md`.
+A **tmux** session `uml-viewer-grok` starts interactive Grok in the
+**examined project's directory** (`--yolo --trust --rules …` plus a launch
+prompt). On start it updates that project's hierarchical policy and
+regenerates the IR. Type there; Esc is the real TUI interrupt. Closing the
+diagram kills that tmux session (and the Terminal attach). That instance —
+not every Grok in this repo — also runs `clj -M:crap`, `clj -M:mutate`, and
+IR generate after later changes. Project-wide rules live in
+`.grok/rules/uml-viewer.md`.
 
-A missing or unreadable file prints `UML viewer: file not found: …` and opens
-an empty window with the error in the inspector, instead of throwing.
+`--restart` opens a new JVM on the current EDN and does **not** start a
+new Grok session. Use it after source changes so the window loads the new
+code while the companion keeps running. Closing the window still kills
+Grok. To recycle the window without killing Grok, write
+`:quit-for-restart` to `.uml-viewer/to-viewer.edn`, wait for the JVM to
+exit, then `clj -M:run --restart examples/uml-viewer.edn`. Do not SIGKILL.
 
-- Double-click a class to open (or retarget) a **class card**. That click
-  brings the card in front. Click empty space on the diagram to bring the
-  diagram in front. The two windows are otherwise independent.
+The window stays blank until the companion sends `:display`, with
+**Waiting for agent to create diagram.** on the canvas. `--restart` and
+`R` load the current EDN immediately and do not wait for the agent. A
+missing or unreadable file prints `UML viewer: file not found: …` in the
+inspector instead of throwing.
+
+- The first view is the **namespace layers** (first segment after the
+  prefix). Dependencies between layers collapse to one arrow. Each layer
+  lists its nested namespaces; double-click a layer to open the next
+  level. Esc or the ← label goes back up. Double-click a leaf module for
+  its **class card**.
 - The class card names the **module** (`:ns`). Click it to open that source
   file at the top. Hover a member to highlight it; click it to open the
   same file positioned at the defn. See [Source extractors](#source-extractors).
-
-- Click a package to inspect it in the sidebar.
 - Methods on the class card are marked `+` public and `-` private. Private
-  functions (`defn-`) are not drawn on the class box. `:hide-members true`
-  hides fields and ops on the box (used on the Layers overview).
+  functions (`defn-`) are not drawn on the class box.
 - Scroll the mouse wheel to pan vertically; Shift-scroll (or left/right arrows)
   for horizontal.
 - `R` reloads the EDN (the watcher also reloads on save). Overlay re-reads
@@ -56,7 +68,7 @@ clj -M:spec
 clj -M:cov
 clj -M:ir                            # writes examples/uml-viewer.edn
 clj -M:crap                          # writes .metrics/crap.edn
-clj -M:mutate src/uml_viewer/layout.clj   # writes .metrics/mutate/uml_viewer/layout.edn
+clj -M:mutate src/uml_viewer/engine/layout.clj   # writes .metrics/mutate/uml_viewer/engine/layout.edn
 ```
 
 This project's `:crap` and `:mutate` aliases use `../clojure/crap4clj` and
@@ -77,11 +89,38 @@ project namespace, `:require` / `:use` of another project ns as
 become **foreign** classes (the full lib name). Members are not authored —
 overlay fills them from `.metrics/`.
 
-The **policy** records the dependency structure the source already has:
-which ns belongs to which layer, which diagrams to draw, and the few
-require-vs-association overrides. It does not create partitions. Do not
-re-home a namespace in `:nses` to fake a layer; change the requires (or
-the ns), then update the policy to match.
+### Do not invent layers
+
+The tree **is** the namespaces. After `:prefix`, every `.` is a nesting
+level. `uml-viewer.engine.layout` is a child of `engine`. `uml-viewer.clojure-language.source-clojure`
+is a child of `clojure-language`. The policy does **not** assign nses to invented
+packages. If you want Domain / Engine / Adapters boxes, those segments must
+exist as namespaces.
+
+To write a policy for a project:
+
+1. Set `:src` and `:prefix` to the project's source root and ns prefix
+   (`src` and `foo` for `foo.bar.baz`).
+2. Set `:hierarchical true` (or omit `:packages` and `:diagrams`).
+3. List top-level **segments** in `:order` — the first dotted part after
+   the prefix, in the order you want the boxes. Do not invent names.
+4. List real libraries in `:foreign` if they should appear as ovals.
+5. Optionally override a require with `:edge-kinds {[:from :to] :association}`
+   using the **leaf** ids (`clojure-language.source-clojure`, not `clojure-language`).
+6. Run `clj -M:ir`.
+
+If `foo.bar` and `foo.bar.baz` both exist, the `bar` box lists `bar` (the
+module) and `baz` (the child). Double-click `bar` the layer to open that
+level; double-click the `bar` module line for its class card.
+
+Wrong (invented partitions):
+
+```edn
+:packages [{:id :domain :nses [ir geom source]}
+           {:id :engine :nses [layout route]}]
+```
+
+Right (the ns tree):
 
 ```edn
 {:title "UML viewer"
@@ -89,34 +128,21 @@ the ns), then update the policy to match.
  :prefix "uml-viewer"
  :lang :clojure
  :out "examples/uml-viewer.edn"
+ :hierarchical true
  :foreign [quil]
- :packages
- [{:id :adapters :label "Adapters" :nses [draw sketch core]}
-  {:id :app :label "Application" :nses [events detail]}
-  {:id :engine :label "Engine" :nses [layout route]}
-  {:id :domain :label "Domain" :nses [ir geom source source.clojure]}]
- :diagrams
- [{:title "Layers" :view :overview :hide-members true :direction :tb}
-  {:title "Adapters" :package :adapters}
-  {:title "Engine" :package :engine
-   :edge-kinds {[:compose :layout] :association}}]}
+ :order [main adapters application engine source graph clojure-language domain]
+ :edge-kinds {[:engine.compose :engine.layout] :association}}
 ```
-
-List `:packages` (and matching `:diagrams`) in dependency order: nothing
-incoming at the top, nothing outgoing at the bottom. Layout stacks them in
-that sequence, so arrows on the Layers overview point down.
 
 | Key | Role |
 |-----|------|
-| `:packages` / `:nses` | Layer membership, class order on the box, and stack order |
-| `:view :overview` | Every package, every listed class, no stubs |
-| `:package` | One layer: home classes plus one-hop project deps as stubs (`:hide-members`) |
+| `:prefix` | Strip this from each ns; remaining dots are the tree |
+| `:hierarchical` | Namespace tree (default when `:packages` is omitted) |
+| `:order` | Order of **existing** top-level ns segments, not new layer names |
 | `:edge-kinds` | Override parser kind for `[from to]` (usually `:association`) |
-| `:omit-edges` | Drop `[from to]` from that diagram |
-| `:hide-members` | Compact boxes (Layers overview, and all stubs) |
-| `:direction` | `:tb` (overview default) or `:lr` (layer default) |
+| `:omit-edges` | Drop `[from to]` |
 | `:lang` | Which `LanguageGraph` to use (default `:clojure`) |
-| `:foreign` | External libs to show as ovals outside every layer. A listed prefix collapses `quil.core` and `quil.middleware` to `quil`. Unlisted externals (`clojure.string`) are omitted. |
+| `:foreign` | External libs as ovals. A listed prefix collapses `quil.core` to `quil`. |
 
 **Viewer Grok loop** (passed with `--rules` to the companion session only)
 
@@ -126,20 +152,39 @@ Uncovered mutants remaining are coverage gaps; keep the snapshot and do
 not re-run the file or force a full mutation because mutate exited
 non-zero.
 
-- Add/rename/delete a namespace, or change a `:require` / protocol: no
-  policy edit unless layering changed; still regenerate.
-- New ns not listed in any `:nses` appears under **Unassigned**. Put it in
-  a package and regenerate.
-- Move a ns to another layer: change its requires so the dependency is
-  real, then edit `:nses` to match, then the usual crap/mutate/ir.
-- New layer or diagram: add a package or diagram entry, then crap/mutate/ir.
+- Add/rename/delete a namespace: the tree updates on `clj -M:ir`. Put a
+  new top-level **segment** in `:order` if you care about box order.
+- Nested nses (`clojure-language.source-clojure`) appear as contents of the parent layer.
 - “This require is really an association”: one `:edge-kinds` entry.
 - Show a library like quil as an oval: add it to `:foreign`.
+- Do not add `:packages` to fake Clean Architecture layers.
 
-- Hand-written sample IRs (e.g. `examples/library.edn`) are still valid;
-  they are not generated.
+Hand-written sample IRs (e.g. `examples/library.edn`) are still valid;
+they are not generated.
 
-`clj -M:ir` prints unassigned namespaces on stderr. The viewer reloads when the generated EDN mtime changes.
+The viewer reloads when the generated EDN mtime changes.
+
+## Companion mailbox
+
+The viewer and the companion Grok talk through `.uml-viewer/` in the examined
+project (gitignored). The file is the mail; tmux is only a doorbell.
+
+| File | Direction |
+|------|-----------|
+| `.uml-viewer/to-viewer.edn` | Grok → viewer |
+| `.uml-viewer/to-agent.edn` | viewer → Grok |
+
+Commands are `{:id n :op …}` with a rising `:id`. Writes are tmp-then-rename.
+
+- `:display` plus `:path` — viewer loads that EDN
+- `:regen` — Grok rewrites hierarchical policy, regenerates IR, then `:display`
+- `:quit-for-restart` — viewer exits the JVM without killing Grok; then
+  `clj -M:run --restart <edn>`
+
+**Regen** in the inspector queues `:regen` and wakes Grok with text, a short
+pause, then Enter (`C-m` then `C-j`), same timing as SwarmForge. The wake-up
+does not contain the command. If Grok is busy, it finishes first, then reads
+the mailbox.
 
 ## Language graphs
 
@@ -155,7 +200,7 @@ with `(graph/register! :java my-java-scanner)`. The scanner must satisfy
 Classes are `{:id :name :ns :stereotype}`. Edges are `{:from :to :kind}`
 (`:dependency` or `:implements`). The policy layer is language-neutral.
 
-**Clojure** (`uml-viewer.graph.clojure`) is the only implementation today: it
+**Clojure** (`uml-viewer.clojure-language.graph-clojure`) is the only implementation today: it
 reads `ns` forms (including prefix lists), `defprotocol`, `defrecord`, and
 `deftype`. Java or C need a different parser; do not special-case languages
 in `policy` or `ir-generator`. Main constructs the implementation and
@@ -163,10 +208,10 @@ passes it in.
 
 ## IR
 
-The generated file is EDN. A document may contain several diagrams (one per
-layer), stacked top to bottom. Unique class `:id`s *within* a diagram;
-packages as groups; edges by kind. A single diagram (top-level `:packages`)
-still works as a hand-written IR.
+A hierarchical policy writes one EDN document of all classes and edges
+(`:hierarchical true`). The viewer builds each screen from the namespace
+tree at the current drill level. A hand-written IR with `:packages` (or
+`:diagrams`) is still a static diagram, e.g. `examples/library.edn`.
 
 Metrics on the class card do not have to be authored. If `.metrics/` is present,
 the overlay fills CC, coverage, CRAP, killed/survived, and any functions found
@@ -245,7 +290,7 @@ scrolls to the member (highlighted).
 
 ```clojure
 (source/member-source {:lang :clojure
-                       :ns "uml-viewer.layout"
+                       :ns "uml-viewer.engine.layout"
                        :name "layout"})
 ```
 
@@ -259,7 +304,7 @@ extractor must satisfy `LanguageSource`:
 | `extract` | slice that member out of the file text |
 | `title` | window title |
 
-**Clojure** (`uml-viewer.source.clojure`) is the only implementation today:
+**Clojure** (`uml-viewer.clojure-language.source-clojure`) is the only implementation today:
 it maps `:ns` to `src/...clj` and finds the top-level `(defn name …)` /
 `(defn- name …)` so the window can jump to that line. That locate/line
 step is not enough for Java or C — those need a parser or language

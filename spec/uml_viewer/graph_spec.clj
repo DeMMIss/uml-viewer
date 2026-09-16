@@ -2,7 +2,7 @@
   (:require [clojure.java.io :as io]
             [speclj.core :refer :all]
             [uml-viewer.graph :as graph]
-            [uml-viewer.graph.clojure]))
+            [uml-viewer.clojure-language.graph-clojure]))
 
 (defn- spit-ns [dir rel content]
   (let [f (io/file dir rel)]
@@ -92,8 +92,9 @@
           by-id (into {} (map (juxt :id identity) (:classes g)))
           edges (set (map (juxt :from :to :kind) (:edges g)))]
       (should= :interface (:stereotype (by-id :source)))
-      (should= "SourceClojure" (:name (by-id :source.clojure)))
-      (should (contains? edges [:source.clojure :source :implements]))
-      (should (contains? edges [:document :compose :dependency]))
+      (should= "ClojureLanguageSourceClojure"
+               (:name (by-id :clojure-language.source-clojure)))
+      (should (contains? edges [:clojure-language.source-clojure :source :implements]))
+      (should (contains? edges [:application.document :engine.compose :dependency]))
       (should (:foreign (by-id :quil.core)))
-      (should (contains? edges [:draw :quil.core :dependency])))))
+      (should (contains? edges [:adapters.draw :quil.core :dependency])))))
