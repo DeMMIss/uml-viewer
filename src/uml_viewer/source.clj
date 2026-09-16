@@ -25,12 +25,15 @@
 (defn- from-impl [impl ident lang]
   (when impl
     (when-let [path (locate impl ident)]
-      (let [src (slurp path)]
-        (when (extract impl src ident)
-          {:title (str path ":" (or (start-line impl src ident) 1))
+      (let [src (slurp path)
+            named? (seq (str (:name ident)))]
+        (when (or (not named?) (extract impl src ident))
+          {:title (if named?
+                    (str path ":" (or (start-line impl src ident) 1))
+                    path)
            :file path
            :body src
-           :line (start-line impl src ident)
+           :line (when named? (start-line impl src ident))
            :lang lang})))))
 
 (defn member-source

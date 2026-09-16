@@ -43,4 +43,11 @@
       (should (str/starts-with? bang "(defn pin-card!"))))
 
   (it "returns nil for an unknown member"
-    (should-be-nil (source/member-source {:ns "uml-viewer.geom" :name "no-such-fn"}))))
+    (should-be-nil (source/member-source {:ns "uml-viewer.geom" :name "no-such-fn"})))
+
+  (it "opens a module at the top of the file when no member name is given"
+    (let [found (source/member-source {:ns "uml-viewer.geom"})]
+      (should= "src/uml_viewer/geom.clj" (:file found))
+      (should= "src/uml_viewer/geom.clj" (:title found))
+      (should (str/starts-with? (:body found) "(ns uml-viewer.geom"))
+      (should-be-nil (:line found)))))

@@ -84,8 +84,48 @@
                 (translate scene dx dy))]
     (with-size scene)))
 
+(defn- nearby-rects [classes e bb]
+  (let [ends #{(:from e) (:to e)}
+        probe (when bb (geom/inflate bb (+ layout/under-gap 8)))]
+    (into []
+          (keep (fn [c]
+                  (when (and (not (:dummy? c))
+                             (not (contains? ends (:id c)))
+                             (or (nil? probe)
+                                 (geom/overlaps? probe (:rect c))))
+                    (:rect c))))
+          classes)))
+
+(defn- prepare-edge [classes e]
+  (let [pts (vec (:points e))]
+    (if-not (next pts)
+      e
+      (let [idx (into {} (map (juxt :id identity) classes))
+            from (idx (:from e))
+            to (idx (:to e))
+            path (-> (curve/basis-path pts)
+                     (curve/constrain-ends (:rect from) (:rect to)))
+            [behind tip] (curve/end-tangent path)
+            samples (curve/flatten-path path)
+            bb (curve/path-bounds path)
+            strokes (geom/gap-polyline samples
+                                       (nearby-rects classes e bb)
+                                       layout/under-gap)]
+        (assoc e
+          :strokes strokes
+          :tip tip
+          :behind behind
+          :draw-bounds bb)))))
+
+(defn- prepare-scene [scene]
+  (let [cs (:classes scene)]
+    (assoc scene
+      :class-by-id (into {} (map (juxt :id identity) cs))
+      :package-by-id (into {} (map (juxt :id identity) (:packages scene)))
+      :edges (mapv #(prepare-edge cs %) (:edges scene)))))
+
 (defn compile-diagram [diagram]
-  (fit-scene (route/route (layout/layout diagram))))
+  (prepare-scene (fit-scene (route/route (layout/layout diagram)))))
 
 (defn compile-document
   "Layout and route each diagram, then stack them top to bottom."
@@ -94,7 +134,7 @@
         title-h 40
         raw (map-indexed
               (fn [i d]
-                (-> (compile-diagram d)
+                (-> (fit-scene (route/route (layout/layout d)))
                     (assoc :title (:title d) :crap (:crap d))
                     (#(qualify i %))))
               (:diagrams doc))
@@ -116,11 +156,14 @@
                    (mapv #(translate % dx 0) sections))
         fitted (with-size (if (zero? dx)
                             stacked
-                            (translate stacked dx 0)))]
+                            (translate stacked dx 0)))
+        prepared (prepare-scene fitted)]
     {:title (:title doc)
      :sections sections
-     :classes (:classes fitted)
-     :packages (:packages fitted)
-     :edges (:edges fitted)
+     :classes (:classes prepared)
+     :packages (:packages prepared)
+     :edges (:edges prepared)
+     :class-by-id (:class-by-id prepared)
+     :package-by-id (:package-by-id prepared)
      :diagram {:title (:title doc)}
-     :size (assoc (:size fitted) :h total-h)}))
+     :size (assoc (:size prepared) :h total-h)}))

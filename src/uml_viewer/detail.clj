@@ -139,6 +139,9 @@
           acc (if-let [st (:stereotype c)]
                 (emit acc :muted (str "«" (name st) "»") {})
                 acc)
+          acc (if-let [ns-name (:ns model)]
+                (emit acc :module ns-name {:module true})
+                acc)
           acc (emit acc :muted pack {})
           acc (if-let [t (:title model)]
                 (emit acc :muted t {})
@@ -193,3 +196,12 @@
                      (<= (:y row) y (+ (:y row) (:h row) -1)))
             (:op-name row)))
         rows))
+
+(defn module-at
+  "True when content-y is on the module (namespace) row."
+  [rows y]
+  (boolean
+    (some (fn [row]
+            (and (:module row)
+                 (<= (:y row) y (+ (:y row) (:h row) -1))))
+          rows)))

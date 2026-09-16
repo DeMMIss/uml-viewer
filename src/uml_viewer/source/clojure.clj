@@ -12,7 +12,8 @@
                   (str/replace "-" "_")
                   (str/replace "." "/"))
           candidates [(str "src/" rel ".clj")
-                      (str "src/" rel ".cljc")]]
+                      (str "src/" rel ".cljc")
+                      (str "src/" rel ".cljs")]]
       (first (filter #(.exists (io/file %)) candidates)))))
 
 (defn- form-end

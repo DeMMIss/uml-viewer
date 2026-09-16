@@ -97,24 +97,31 @@
                     (or (:dummy? c) (contains? ends (:id c))))
                   (:classes scene)))))
 
-(defn- draw-edge [e selected? scene]
+(defn- live-edge [e scene]
   (let [pts (vec (:points e))]
     (when (next pts)
-      (stroke-rgb (if selected? gold muted) (if selected? 2.2 1.4))
-      (q/no-fill)
-      (q/stroke-cap :round)
       (let [from (hit/class-by-id scene (:from e))
             to (hit/class-by-id scene (:to e))
             path (-> (curve/basis-path pts)
                      (curve/constrain-ends (:rect from) (:rect to)))
             [behind tip] (curve/end-tangent path)
             samples (curve/flatten-path path)
-            obstacles (obstacle-rects scene e)
-            strokes (geom/gap-polyline samples obstacles layout/under-gap)]
-        (doseq [sub strokes]
-          (draw-polyline sub))
-        (when (:head e)
-          (arrowhead (:head e) tip behind))))))
+            obstacles (obstacle-rects scene e)]
+        {:strokes (geom/gap-polyline samples obstacles layout/under-gap)
+         :tip tip
+         :behind behind}))))
+
+(defn- draw-edge [e selected? scene]
+  (when-let [drawn (if (:strokes e)
+                     e
+                     (live-edge e scene))]
+    (stroke-rgb (if selected? gold muted) (if selected? 2.2 1.4))
+    (q/no-fill)
+    (q/stroke-cap :round)
+    (doseq [sub (:strokes drawn)]
+      (draw-polyline sub))
+    (when (and (:head e) (:tip drawn))
+      (arrowhead (:head e) (:tip drawn) (:behind drawn)))))
 
 (defn- draw-package [p selected?]
   (let [r (:rect p)
@@ -264,27 +271,43 @@
     (when-let [err (:error state)]
       (draw-sidebar-error x (q/height) err))))
 
+(defn- in-view? [r cam-x cam-y vw vh]
+  (and r
+       (< (:x r) (+ cam-x vw))
+       (> (geom/right r) cam-x)
+       (< (:y r) (+ cam-y vh))
+       (> (geom/bottom r) cam-y)))
+
 (defn draw-state [state]
   (apply q/background bg)
   (q/push-matrix)
   (q/translate (- (:cam-x state)) (- (:cam-y state)))
-  (doseq [sec (:sections (:scene state))]
-    (rgb gold)
-    (q/text-align :left :top)
-    (q/text-size 20)
-    (q/text (or (:title sec) "") layout/pad (:title-y sec)))
-  (doseq [p (:packages (:scene state))]
-    (draw-package p (and (= :package (get-in state [:selected :kind]))
-                         (= (:id p) (get-in state [:selected :id])))))
-  (let [sel-id (when (= :class (get-in state [:selected :kind]))
+  (let [cam-x (:cam-x state 0)
+        cam-y (:cam-y state 0)
+        vw (max 0 (- (q/width) layout/sidebar-w))
+        vh (q/height)
+        scene (:scene state)
+        sel-id (when (= :class (get-in state [:selected :kind]))
                  (get-in state [:selected :id]))
         hover-id (when (= :class (get-in state [:hover :kind]))
                    (get-in state [:hover :id]))]
-    (doseq [e (:edges (:scene state))]
+    (doseq [sec (:sections scene)]
+      (rgb gold)
+      (q/text-align :left :top)
+      (q/text-size 20)
+      (q/text (or (:title sec) "") layout/pad (:title-y sec)))
+    (doseq [p (:packages scene)
+            :when (in-view? (:rect p) cam-x cam-y vw vh)]
+      (draw-package p (and (= :package (get-in state [:selected :kind]))
+                           (= (:id p) (get-in state [:selected :id])))))
+    (doseq [e (:edges scene)
+            :when (let [b (:draw-bounds e)]
+                    (or (nil? b) (in-view? b cam-x cam-y vw vh)))]
       (draw-edge e
                  (or (= sel-id (:from e)) (= sel-id (:to e)))
-                 (:scene state)))
-    (doseq [c (remove :dummy? (:classes (:scene state)))]
+                 scene))
+    (doseq [c (remove :dummy? (:classes scene))
+            :when (in-view? (:rect c) cam-x cam-y vw vh)]
       (draw-class c
                   (= sel-id (:id c))
                   (= hover-id (:id c)))))
@@ -299,6 +322,7 @@
 (defn- detail-row-color [row]
   (case (:kind row)
     :name ink
+    :module ink
     :crap gold
     :heading gold
     :field ink
@@ -367,5 +391,6 @@
    (q/push-matrix)
    (q/translate 0 (- scroll))
    (doseq [row (detail/rows model)]
-     (draw-detail-row row (and hover (= hover (:op-name row)))))
+     (draw-detail-row row (or (and hover (= hover (:op-name row)))
+                               (and (= hover :module) (:module row)))))
    (q/pop-matrix)))

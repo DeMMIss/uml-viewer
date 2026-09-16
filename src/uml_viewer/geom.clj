@@ -53,6 +53,14 @@
          (< ymin (bottom r))
          (> ymax (:y r)))))
 
+(defn overlaps?
+  "True if axis-aligned rects a and b intersect."
+  [a b]
+  (and (< (:x a) (right b))
+       (> (right a) (:x b))
+       (< (:y a) (bottom b))
+       (> (bottom a) (:y b))))
+
 (defn inflate [r pad]
   (rect (- (:x r) pad)
         (- (:y r) pad)

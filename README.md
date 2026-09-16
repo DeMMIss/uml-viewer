@@ -36,9 +36,10 @@ an empty window with the error in the inspector, instead of throwing.
 - Double-click a class to open (or retarget) a **class card**. That click
   brings the card in front. Click empty space on the diagram to bring the
   diagram in front. The two windows are otherwise independent.
-- Hover a member on the class card to highlight it. Click it to open
-  an independent source window (syntax-colored HTML, same style as arch-view).
-  See [Source extractors](#source-extractors).
+- The class card names the **module** (`:ns`). Click it to open that source
+  file at the top. Hover a member to highlight it; click it to open the
+  same file positioned at the defn. See [Source extractors](#source-extractors).
+
 - Click a package to inspect it in the sidebar.
 - Methods on the class card are marked `+` public and `-` private. Private
   functions (`defn-`) are not drawn on the class box. `:hide-members true`

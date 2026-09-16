@@ -17,6 +17,18 @@
    :mtime 0})
 
 (describe "document"
+  (it "bakes edge strokes so the draw loop does not recompute splines"
+    (let [scene (compose/compile-diagram
+                  (ir/normalize
+                    {:packages [{:id :p :label "P"
+                                 :classes [{:id :a :name "A"}
+                                           {:id :b :name "B"}]}]
+                     :edges [{:from :a :to :b :kind :dependency}]}))
+          e (first (:edges scene))]
+      (should (seq (:strokes e)))
+      (should (:tip e))
+      (should (:draw-bounds e))))
+
   (it "loads a document from disk"
     (let [s (document/load-path "examples/library.edn")]
       (should (seq (:classes (:scene s))))

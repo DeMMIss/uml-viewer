@@ -3,6 +3,13 @@
             [uml-viewer.geom :as geom]))
 
 (describe "geom"
+  (it "detects overlapping rectangles"
+    (let [a (geom/rect 0 0 10 10)
+          b (geom/rect 5 5 10 10)
+          c (geom/rect 20 0 5 5)]
+      (should (geom/overlaps? a b))
+      (should-not (geom/overlaps? a c))))
+
   (it "clips a ray from the center onto the rectangle border"
     (let [r (geom/rect 0 0 100 50)
           [x y] (geom/intersect-rect r [200 25])]

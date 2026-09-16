@@ -279,8 +279,10 @@
 (defn- detail-mouse-moved [state event]
   (if-let [model (:model @!bridge)]
     (assoc state :hover
-           (detail/member-at (detail/rows model)
-                             (+ (:y event) (:scroll state 0))))
+           (let [y (+ (:y event) (:scroll state 0))
+                 rows (detail/rows model)]
+             (or (detail/member-at rows y)
+                 (when (detail/module-at rows y) :module))))
     (assoc state :hover nil)))
 
 (defn- detail-mouse-exited [state _event]
@@ -300,10 +302,16 @@
   (when-let [model (:model @!bridge)]
     (let [y (+ (:y event) (:scroll state 0))
           rows (detail/rows model)]
-      (if-let [op (detail/member-at rows y)]
-        (source-window/open-member-window! (:source @!bridge) (:ns model) op)
-        (when-let [id (detail/rel-at rows y)]
-          (swap! !bridge assoc :pick id)))))
+      (cond
+        (detail/module-at rows y)
+        (source-window/open-member-window! (:source @!bridge) {:ns (:ns model)})
+
+        (detail/member-at rows y)
+        (source-window/open-member-window! (:source @!bridge) (:ns model)
+                                           (detail/member-at rows y))
+
+        (detail/rel-at rows y)
+        (swap! !bridge assoc :pick (detail/rel-at rows y)))))
   state)
 
 (defn- detail-key-pressed [state event]

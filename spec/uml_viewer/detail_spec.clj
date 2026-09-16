@@ -14,6 +14,7 @@
        :packages
        [{:id :p :label "Domain"
          :classes [{:id :a :name "A"
+                    :ns "demo.a"
                     :coverage 0.9
                     :crap 1.2
                     :ops [{:name "go" :args ["x"] :returns "void"
@@ -53,8 +54,13 @@
           cls (first (filter #(and (= :stats (:kind %)) (= "A" (:text %))) rows))
           rel (first (filter #(= :rel (:kind %)) rows))]
       (should= "A" (get-in model [:class :name]))
+      (should= "demo.a" (:ns model))
       (should= 0.9 (get-in model [:class :coverage]))
-      (should (some #{:name :stats :col-header :rel} kinds))
+      (should (some #{:name :module :stats :col-header :rel} kinds))
+      (should= "demo.a" (:text (first (filter :module rows))))
+      (let [mod (first (filter :module rows))]
+        (should (detail/module-at rows (+ (:y mod) 1)))
+        (should-not (detail/module-at rows (+ (:y go) 1))))
       (should= "90%" (:cov-s cls))
       (should= "1.2μ" (:crap-s cls))
       (should-be-nil (:cc-s cls))
