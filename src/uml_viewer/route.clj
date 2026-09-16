@@ -97,14 +97,44 @@
          (stub-ok? (:rect from) (first pts) (nth pts 1))
          (stub-ok? (:rect to) (last pts) (nth pts (- (count pts) 2))))))
 
+(defn- reverses-past-target?
+  "True if the path goes past the destination on the flow axis and then turns back."
+  [pts]
+  (let [pts (vec pts)]
+    (if (< (count pts) 3)
+      false
+      (let [s (first pts)
+            e (last pts)
+            lr? (>= (abs (- (first e) (first s)))
+                    (abs (- (second e) (second s))))
+            axis (if lr? first second)
+            sv (double (axis s))
+            ev (double (axis e))
+            dir (compare ev sv)
+            pad 12.0]
+        (if (zero? dir)
+          false
+          (boolean
+            (some (fn [i]
+                    (let [a (double (axis (nth pts i)))
+                          b (double (axis (nth pts (inc i))))]
+                      (if (pos? dir)
+                        (and (> a (+ ev pad)) (< b (- a 1.0)))
+                        (and (< a (- ev pad)) (> b (+ a 1.0))))))
+                  (range 0 (dec (count pts))))))))))
+
 (defn- try-paths [candidates from-id to-id classes]
   (let [clear (filterv #(and (seq %)
                              (not (path-hits? % from-id to-id classes)))
                        candidates)
-        ok (filterv #(path-attach-ok? % from-id to-id classes) clear)]
+        ok (filterv #(and (path-attach-ok? % from-id to-id classes)
+                          (not (reverses-past-target? %)))
+                    clear)]
     (if (seq ok)
       (apply max-key min-turn-dot ok)
-      (or (first clear) (first candidates)))))
+      (or (first (filterv #(not (reverses-past-target? %)) clear))
+          (first clear)
+          (first candidates)))))
 
 (defn- rank-extent [classes rank lr? side]
   (let [ns (filter #(= rank (:rank % 0)) classes)]
@@ -228,18 +258,22 @@
 (defn- via-rank [classes rank start end i lr?]
   (when-let [bb (rank-bbox classes rank)]
     (if lr?
-      (let [y (clamp (/ (+ (second start) (second end)) 2.0)
-                     (:y bb)
-                     (geom/bottom bb))
+      (let [lo (min (second start) (second end))
+            hi (max (second start) (second end))
+            y (clamp (/ (+ (second start) (second end)) 2.0) lo hi)
             left (- (:x bb) (+ layout/lane-gap (* i layout/lane-gap)))
             right (+ (geom/right bb) (+ layout/lane-gap (* i layout/lane-gap)))]
         [[left y] [right y]])
-      (let [x (clamp (/ (+ (first start) (first end)) 2.0)
-                     (:x bb)
-                     (geom/right bb))
-            top (- (:y bb) (+ layout/lane-gap (* i layout/lane-gap)))
-            bot (+ (geom/bottom bb) (+ layout/lane-gap (* i layout/lane-gap)))]
-        [[x top] [x bot]]))))
+      (let [lo (min (second start) (second end))
+            hi (max (second start) (second end))
+            x (clamp (/ (+ (first start) (first end)) 2.0)
+                     (min (first start) (first end))
+                     (max (first start) (first end)))
+            top (clamp (- (:y bb) (+ layout/lane-gap (* i layout/lane-gap))) lo hi)
+            bot (clamp (+ (geom/bottom bb) (+ layout/lane-gap (* i layout/lane-gap))) lo hi)]
+        (if (< (abs (- top bot)) 1.0)
+          [[x top]]
+          [[x top] [x bot]])))))
 
 (defn- through-intermediates [from to start end classes i lr?]
   (let [rf (:rank from 0)
@@ -398,23 +432,54 @@
                             (group-by (juxt :id :face))))]
     (assoc scene :edges (apply-ports edges placed))))
 
+(defn- geometric-channel [from to lr?]
+  (let [a (:rect from)
+        b (:rect to)]
+    (if lr?
+      (let [lo (min (geom/right a) (geom/right b))
+            hi (max (:x a) (:x b))]
+        {:lo lo :hi hi :span (- hi lo)})
+      (let [lo (min (geom/bottom a) (geom/bottom b))
+            hi (max (:y a) (:y b))]
+        {:lo lo :hi hi :span (- hi lo)}))))
+
+(defn- side-then-flow [from to from-t to-t i lr?]
+  (let [pad (+ (* 2 layout/lane-gap) (* i layout/lane-gap))
+        a (:rect from)
+        b (:rect to)
+        {:keys [to-face]} (flow-faces from to lr?)
+        end (port to to-face to-t)]
+    (if lr?
+      (let [top (- (min (:y a) (:y b)) pad)
+            bot (+ (max (geom/bottom a) (geom/bottom b)) pad)
+            start-t (port from :top from-t)
+            start-b (port from :bottom from-t)]
+        [(collapse [start-t [(first start-t) top] [(first end) top] end])
+         (collapse [start-b [(first start-b) bot] [(first end) bot] end])])
+      (let [left (- (min (:x a) (:x b)) pad)
+            right (+ (max (geom/right a) (geom/right b)) pad)
+            start-l (port from :left from-t)
+            start-r (port from :right from-t)]
+        [(collapse [start-l [left (second start-l)] [left (second end)] end])
+         (collapse [start-r [right (second start-r)] [right (second end)] end])]))))
+
+(defn- stacked? [from to lr?]
+  (if lr?
+    (or (> (- (:x (:rect to)) (geom/right (:rect from))) 8)
+        (> (- (:x (:rect from)) (geom/right (:rect to))) 8))
+    (or (> (- (:y (:rect to)) (geom/bottom (:rect from))) 8)
+        (> (- (:y (:rect from)) (geom/bottom (:rect to))) 8))))
+
 (defn- hop-candidates [from to from-t to-t i n classes lr?]
   (let [{:keys [from-face to-face]} (flow-faces from to lr?)
         start (port from from-face from-t)
         end (port to to-face to-t)
-        ch (or (channel classes (:rank from 0) (:rank to 0) lr?)
-               (let [a (:rect from) b (:rect to)]
-                 (if lr?
-                   (let [lo (min (geom/right a) (geom/right b))
-                         hi (max (:x a) (:x b))]
-                     {:lo lo :hi hi :span (- hi lo)})
-                   (let [lo (min (geom/bottom a) (geom/bottom b))
-                         hi (max (:y a) (:y b))]
-                     {:lo lo :hi hi :span (- hi lo)}))))
+        ch (geometric-channel from to lr?)
         primary (through-channel start end ch i n lr?)
         alt (through-channel start end ch (- n i 1) n lr?)
-        via (through-intermediates from to start end classes i lr?)]
-    (remove nil? [primary via alt (collapse [start end])])))
+        via (through-intermediates from to start end classes i lr?)
+        sides (side-then-flow from to from-t to-t i lr?)]
+    (remove nil? (concat [primary] sides [via alt (collapse [start end])]))))
 
 (defn- port-t [groups sort-key]
   (into {}
@@ -460,7 +525,7 @@
                 (let [from (:from-n e)
                       to (:to-n e)
                       [i n] (hop-index e [0 1])
-                      same? (= (:rank from 0) (:rank to 0))
+                      same? (not (stacked? from to lr?))
                       raw (if same?
                             (try-paths (same-rank-candidates from to
                                                             (from-t e 0.5)

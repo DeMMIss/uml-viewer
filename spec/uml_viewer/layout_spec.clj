@@ -156,6 +156,24 @@
       (should= 5 (count outs))
       (should= 5 (count (distinct mids)))))
 
+  (it "does not pass a downward target and reverse back to it"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :up :label "Up"
+                 :classes [{:id :src :name "Src"}]}
+                {:id :down :label "Down"
+                 :classes [{:id :dst :name "Dst"}]}]
+               :edges [{:from :src :to :dst :kind :dependency}]})
+          scene (route/route (layout/layout d))
+          src (first (filter #(= :src (:id %)) (:classes scene)))
+          dst (first (filter #(= :dst (:id %)) (:classes scene)))
+          e (first (filter #(and (= :src (:from %)) (= :dst (:to %)))
+                           (:edges scene)))
+          ys (map second (:points e))
+          end-y (second (last (:points e)))]
+      (should (< (geom/cy (:rect src)) (geom/cy (:rect dst))))
+      (should (<= (apply max ys) (+ end-y 12.0)))))
+
   (it "leaves a downward cross-package edge from the source bottom"
     (let [d (ir/normalize
               {:packages
