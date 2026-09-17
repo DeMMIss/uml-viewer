@@ -548,6 +548,7 @@
         (should= :main-applet (sketch/start! "doc.edn" :source-impl))
         (should= "UML viewer" (:title @opts))
         (should= [sketch/window-width sketch/window-height] (:size @opts))
+        (should= [:resizable] (:features @opts))
         (quiet-quil
           (fn []
             (with-redefs [document/waiting-state (fn [p] {:path p :waiting true})
@@ -563,7 +564,16 @@
               ((:mouse-moved @opts) :s {:x 4 :y 5})
               (should= [:s 4 5] @moved)
               ((:key-pressed @opts) :s {:key :r})
-              (should= [:s :r {:window-w 1500 :window-h 920 :view-w 1220}] @keyed)
+              (should= [:s :r {:window-w 1500 :window-h 920 :view-w 1220
+                               :control? false :key-code nil :raw-key nil}] @keyed)
+              ((:key-pressed @opts) :s {:key :+ :modifiers #{:control}})
+              (should= [:s :+ {:window-w 1500 :window-h 920 :view-w 1220
+                               :control? true :key-code nil :raw-key nil}] @keyed)
+              ((:key-pressed @opts) :s {:key :unknown-key :key-code 45
+                                        :raw-key \- :modifiers #{:control}})
+              (should= [:s :unknown-key {:window-w 1500 :window-h 920 :view-w 1220
+                                         :control? true :key-code 45 :raw-key \-}]
+                       @keyed)
               (should= :s ((:on-close @opts) :s))))))))
 
 (describe "grok session"

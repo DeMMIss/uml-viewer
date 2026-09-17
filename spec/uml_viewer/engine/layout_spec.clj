@@ -12,7 +12,7 @@
     (should-be-nil (layout/format-coverage nil))
     (should= "3 killed / 1 survived" (layout/format-mutants 3 1))
     (should-be-nil (layout/format-mutants nil nil))
-    (should= "μ 1.2   max 2.0   σ 0.4"
+    (should= "Crap μ 1.2   max 2.0   σ 0.4"
              (layout/format-crap {:mu 1.2 :max 2.0 :sigma 0.4}))
     (should-be-nil (layout/format-crap nil))))
 

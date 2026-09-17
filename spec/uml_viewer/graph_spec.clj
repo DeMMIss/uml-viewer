@@ -49,6 +49,22 @@
         (should (:foreign (by-id :clojure.string)))
         (should (contains? edges [:a :clojure.string :dependency])))))
 
+  (it "treats requiring-resolve as a dependency"
+    (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                       (str "uml-graph-rr-" (System/nanoTime)))]
+      (spit-ns dir "demo/a.clj"
+               "(ns demo.a)
+                (defn go []
+                  ((requiring-resolve 'demo.b/run))
+                  @(clojure.core/requiring-resolve 'quil.core/width))")
+      (spit-ns dir "demo/b.clj" "(ns demo.b)")
+      (let [g (graph/scan (graph/lookup :clojure) dir {:prefix "demo"})
+            edges (set (map (juxt :from :to :kind) (:edges g)))
+            by-id (into {} (map (juxt :id identity) (:classes g)))]
+        (should (contains? edges [:a :b :dependency]))
+        (should (contains? edges [:a :quil.core :dependency]))
+        (should (:foreign (by-id :quil.core))))))
+
   (it "treats Java imports as foreign packages"
     (let [dir (io/file (System/getProperty "java.io.tmpdir")
                        (str "uml-graph-imp-" (System/nanoTime)))]

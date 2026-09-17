@@ -9,11 +9,15 @@
 (def col-gap 10)
 
 (def columns
-  [{:id :crap :label "Crap" :key :crap-s :w 56}
-   {:id :cc :label "CC" :key :cc-s :w 32}
-   {:id :cov :label "Cov" :key :cov-s :w 44}
-   {:id :killed :label "killed" :key :killed-s :w 52}
-   {:id :survived :label "survived" :key :survived-s :w 68}])
+  [{:id :crap :label "Crap" :key :crap-s :w 56 :group :crap}
+   {:id :cc :label "CC" :key :cc-s :w 32 :group :crap}
+   {:id :cov :label "Cov" :key :cov-s :w 44 :group :crap}
+   {:id :killed :label "killed" :key :killed-s :w 52 :group :mutation}
+   {:id :survived :label "survived" :key :survived-s :w 68 :group :mutation}])
+
+(def group-labels
+  {:crap "--crap--"
+   :mutation "--mutation--"})
 
 (def ^:private rel-phrases
   {:inheritance ["extends" "extended by"]
@@ -58,6 +62,17 @@
             left (- x (:w c))]
         (recur (rest cols) (- left col-gap)
                (cons (assoc c :left left :right right) acc))))))
+
+(defn group-layout
+  "Spans of `--crap--` / `--mutation--` over their columns."
+  []
+  (->> (column-layout)
+       (partition-by :group)
+       (mapv (fn [cs]
+               {:id (:group (first cs))
+                :label (get group-labels (:group (first cs)))
+                :left (:left (first cs))
+                :right (:right (last cs))}))))
 
 (defn- crap-mu [crap]
   (cond
@@ -115,6 +130,7 @@
 
 (defn- emit-table [acc c]
   (let [acc (update acc :y + 12)
+        acc (emit acc :group-header "" {})
         acc (emit acc :col-header "" {})
         acc (emit acc :stats (:name c) (format-cells (class-metrics c)))]
     (reduce (fn [acc op]

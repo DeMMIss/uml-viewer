@@ -350,7 +350,7 @@
 
 (defn- draw-sidebar-empty [x]
   (rgb muted)
-  (q/text "Click a component for its card.\nDouble-click a layer to open it.\nEsc (or ←) goes up a level.\nScroll to pan; Shift-scroll for horizontal.\nR reloads the EDN file."
+  (q/text "Click a component for its card.\nDouble-click a layer to open it.\nEsc (or ←) goes up a level.\nScroll to pan; Shift-scroll for horizontal.\nCtrl+ / Ctrl- zoom 10%; Ctrl+0 resets.\nR reloads the EDN file."
           (+ x 16) 48))
 
 (defn- draw-sidebar-class [x scene id]
@@ -433,11 +433,13 @@
   (when (:waiting state)
     (draw-waiting))
   (q/push-matrix)
-  (q/translate (- (:cam-x state)) (- (:cam-y state)))
-  (let [cam-x (:cam-x state 0)
+  (let [z (double (or (:zoom state) 1.0))
+        cam-x (:cam-x state 0)
         cam-y (:cam-y state 0)
         vw (max 0 (- (q/width) layout/sidebar-w))
         vh (q/height)
+        world-w (/ vw z)
+        world-h (/ vh z)
         scene (:scene state)
         sel (:selected state)
         hover (:hover state)
@@ -451,24 +453,26 @@
                    (= :child (:kind hover)) (:parent hover)
                    (= :port (:kind hover)) (:parent hover)
                    :else nil)]
+    (q/scale z)
+    (q/translate (- cam-x) (- cam-y))
     (doseq [sec (:sections scene)]
       (rgb gold)
       (q/text-align :left :top)
       (q/text-size 20)
       (q/text (or (:title sec) "") layout/pad (:title-y sec)))
     (doseq [p (:packages scene)
-            :when (in-view? (:rect p) cam-x cam-y vw vh)]
+            :when (in-view? (:rect p) cam-x cam-y world-w world-h)]
       (draw-package p (and (= :package (get-in state [:selected :kind]))
                            (= (:id p) (get-in state [:selected :id])))))
     (doseq [e (:edges scene)
             :when (let [b (:draw-bounds e)]
-                    (or (nil? b) (in-view? b cam-x cam-y vw vh)))]
+                    (or (nil? b) (in-view? b cam-x cam-y world-w world-h)))]
       (draw-edge e
                  (or (= sel-id (:from e)) (= sel-id (:to e)))
                  scene))
     (doseq [c (remove :dummy? (:classes scene))
-            :when (or (in-view? (:rect c) cam-x cam-y vw vh)
-                      (some #(in-view? (:rect %) cam-x cam-y vw vh)
+            :when (or (in-view? (:rect c) cam-x cam-y world-w world-h)
+                      (some #(in-view? (:rect %) cam-x cam-y world-w world-h)
                             (concat (:in-ports c) (:out-ports c))))]
       (draw-class c
                   (= sel-id (:id c))
@@ -500,14 +504,15 @@
     :stats ink
     muted))
 
+(defn- mutation-ink [row]
+  (stroke-for (config/mutation-grade (config/mutation-ratio row))))
+
 (defn- cell-color [row col]
   (case (:id col)
     :cov (coverage-ink (:coverage row))
     :crap (stroke-for (config/crap-grade (:crap-n row)))
-    :survived (if (pos? (or (:survived row) 0))
-                [224 122 74]
-                muted)
-    :killed muted
+    :killed (mutation-ink row)
+    :survived (mutation-ink row)
     :cc muted
     muted))
 
@@ -523,6 +528,14 @@
                gold
                (cell-color row col)))
         (q/text s (:right col) y)))))
+
+(defn- draw-detail-groups [y]
+  (doseq [g (detail/group-layout)]
+    (when (:label g)
+      (q/text-align :center :top)
+      (q/text-size 13)
+      (rgb gold)
+      (q/text (:label g) (/ (+ (:left g) (:right g)) 2.0) y))))
 
 (defn- draw-hover-wash [row]
   (q/no-stroke)
@@ -549,6 +562,7 @@
 (defn- draw-detail-row [row hover?]
   (when hover? (draw-hover-wash row))
   (case (:kind row)
+    :group-header (draw-detail-groups (:y row))
     :col-header (draw-detail-cells row (:y row))
     :stats (do (draw-row-label row hover?)
                (draw-detail-cells row (:y row)))

@@ -28,7 +28,7 @@
 
 (defn format-crap [crap]
   (when (:mu crap)
-    (format "μ %.1f   max %.1f   σ %.1f"
+    (format "Crap μ %.1f   max %.1f   σ %.1f"
             (double (:mu crap))
             (double (or (:max crap) (:mu crap)))
             (double (or (:sigma crap) 0)))))

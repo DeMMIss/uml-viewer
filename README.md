@@ -76,8 +76,11 @@ Rename or move of a function is a new form: overlay does not match old names.
   **I**. Names of rectangles that are not classes (layers, interfaces,
   enumerations, package banners) are italic. Foreign libraries listed in
   policy are ovals outside the layers.
+- The main window is resizable.
 - Scroll to pan vertically; Shift-scroll (or left/right arrows) for
   horizontal. Pan can follow arrows that bow past the origin.
+- **Ctrl+** (or **Ctrl+=**) zooms in 10%; **Ctrl-** zooms out 10%;
+  **Ctrl+0** restores 100%. Zoom keeps the view center still.
 - **Regen** in the inspector asks the companion to rewrite policy and IR
   (see [Companion mailbox](#companion-mailbox)).
 - `R` reloads the current EDN (the watcher also reloads on save). Overlay
@@ -91,7 +94,8 @@ Edit `examples/uml-viewer.policy.edn`, then run `clj -M:ir` (or press Regen).
 
 The **parser** (`LanguageGraph`) reads source and emits facts: one class per
 project namespace, `:require` / `:use` of another project ns as
-`:dependency`, `defprotocol` as `:stereotype :interface`, `defrecord` /
+`:dependency`, `requiring-resolve` of a quoted var as `:dependency` on that
+var's namespace, `defprotocol` as `:stereotype :interface`, `defrecord` /
 `deftype` of a protocol as `:implements`. External `:require`s and `:import`s
 become **foreign** classes. Members are not authored — overlay fills them from
 `.metrics/`.
@@ -212,9 +216,10 @@ Classes are `{:id :name :ns :stereotype}`. Edges are `{:from :to :kind}`
 
 **Clojure** (`uml-viewer.clojure-language.graph-clojure`) is the only
 implementation today: it reads `ns` forms (including prefix lists),
-`defprotocol`, `defrecord`, and `deftype`. Java or C need a different parser;
-do not special-case languages in `policy` or `ir-generator`. Main constructs
-the implementation and passes it in.
+`requiring-resolve` of a quoted var (including nested calls), `defprotocol`,
+`defrecord`, and `deftype`. Java or C need a different parser; do not
+special-case languages in `policy` or `ir-generator`. Main constructs the
+implementation and passes it in.
 
 ## IR
 
@@ -265,12 +270,16 @@ Optional authored metrics, used when snapshots are missing:
 
 Package and class **color** maps CRAP (`μ + σ`) and mutation score each onto
 1–10 using `uml-viewer.domain.config` cutoffs, averages them, and paints a
-0–10 red–green fill. Parents take the worst CRAP and worst mutation of their
-children. A **C** and **M** dot in the upper-right show the two scores. The
-boxes no longer print μ / max / σ.
+0–10 red–green fill. Missing CRAP or mutation data counts as red (grade 1),
+not unknown. Parents take the worst CRAP and worst mutation of their
+children, and a child with no data is the worst. A **C** and **M** dot in
+the upper-right show the two scores. The boxes no longer print μ / max / σ.
 
-On the class card, the class row shows average CRAP with a `μ` suffix and omits
-CC. Max on the header line is the worst function in the namespace, not a sum.
+On the class card, a `Crap μ … max … σ …` line sits above the table (max is
+the worst function in the namespace, not a sum). Column groups are labeled
+`--crap--` (Crap, CC, Cov) and `--mutation--` (killed, survived). The class
+row shows average CRAP with a `μ` suffix and omits CC. Killed and survived
+use the same mutation-grade colors as the **M** dot.
 
 Edge `:kind` values:
 

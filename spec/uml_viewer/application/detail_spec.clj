@@ -56,7 +56,7 @@
       (should= "A" (get-in model [:class :name]))
       (should= "demo.a" (:ns model))
       (should= 0.9 (get-in model [:class :coverage]))
-      (should (some #{:name :module :stats :col-header :rel} kinds))
+      (should (some #{:name :module :stats :group-header :col-header :rel} kinds))
       (should= "demo.a" (:text (first (filter :module rows))))
       (let [mod (first (filter :module rows))]
         (should (detail/module-at rows (+ (:y mod) 1)))
@@ -81,7 +81,7 @@
       (should-be-nil (detail/member-at rows (:y cls)))
       (should= "hide" (detail/member-at rows (+ (:y hide) 1)))))
 
-  (it "shows class CRAP as μ, omits CC, and keeps μ/max/σ on the header line"
+  (it "shows class CRAP as μ, omits CC, and prefixes μ/max/σ with Crap"
     (let [s (compose/compile-diagram
               (ir/normalize
                 {:packages
@@ -95,6 +95,7 @@
           header (first (filter #(= :crap (:kind %)) rows))]
       (should= "14.2μ" (:crap-s cls))
       (should-be-nil (:cc-s cls))
+      (should (re-find #"^Crap μ" (:text header)))
       (should (re-find #"max 134\.6" (:text header)))))
 
   (it "returns nil for an unknown class"
@@ -104,6 +105,18 @@
     (let [cols (detail/column-layout)]
       (should= ["Crap" "CC" "Cov" "killed" "survived"] (map :label cols))
       (should (apply < (map :left cols)))))
+
+  (it "spans --crap-- and --mutation-- over their columns"
+    (let [cols (detail/column-layout)
+          groups (detail/group-layout)
+          crap-cols (filter #(= :crap (:group %)) cols)
+          mut-cols (filter #(= :mutation (:group %)) cols)]
+      (should= ["--crap--" "--mutation--"] (map :label groups))
+      (should= (:left (first crap-cols)) (:left (first groups)))
+      (should= (:right (last crap-cols)) (:right (first groups)))
+      (should= (:left (first mut-cols)) (:left (second groups)))
+      (should= (:right (last mut-cols)) (:right (second groups)))
+      (should (< (:right (first groups)) (:left (second groups))))))
 
   (it "does not treat a field row as a relationship hit"
     (let [rows (detail/rows (detail/model (scene) :a))

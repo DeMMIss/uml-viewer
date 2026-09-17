@@ -34,4 +34,4 @@
       (do
         (sketch/start! path source-impl restart?)
         (println "Watching" path)
-        (println "Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). R reloads.")))))
+        (println "Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). Ctrl+/− zoom; Ctrl+0 resets. R reloads.")))))

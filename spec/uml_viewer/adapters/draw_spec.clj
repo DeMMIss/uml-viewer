@@ -38,6 +38,7 @@
                   q/push-matrix (rec :push-matrix)
                   q/pop-matrix (rec :pop-matrix)
                   q/translate (rec :translate)
+                  q/scale (rec :scale)
                   q/width (fn [] 1500)
                   q/height (fn [] 920)]
       (f log))))
@@ -106,14 +107,19 @@
 
   (it "colors detail cells by column"
     (let [high {:coverage 0.9 :crap-n 0 :survived 0 :killed 4}
-          low {:coverage 0.2 :crap-n 24 :survived 2}]
+          low {:coverage 0.2 :crap-n 24 :survived 2}
+          high-mut (draw/stroke-for (config/mutation-grade
+                                      (config/mutation-ratio high)))
+          low-mut (draw/stroke-for (config/mutation-grade
+                                     (config/mutation-ratio low)))]
       (should= (draw/coverage-ink 0.9) (call 'cell-color high {:id :cov}))
       (should= (draw/stroke-for (config/crap-grade 0)) (call 'cell-color high {:id :crap}))
-      (should= draw/muted (call 'cell-color high {:id :survived}))
-      (should= draw/muted (call 'cell-color high {:id :killed}))
+      (should= high-mut (call 'cell-color high {:id :survived}))
+      (should= high-mut (call 'cell-color high {:id :killed}))
       (should= draw/muted (call 'cell-color high {:id :cc}))
       (should= draw/muted (call 'cell-color high {:id :name}))
-      (should= [224 122 74] (call 'cell-color low {:id :survived}))
+      (should= low-mut (call 'cell-color low {:id :survived}))
+      (should= low-mut (call 'cell-color low {:id :killed}))
       (should= (draw/stroke-for (config/crap-grade 24)) (call 'cell-color low {:id :crap}))
       (should= (draw/coverage-ink 0.2) (call 'cell-color low {:id :cov})))))
 
@@ -447,6 +453,10 @@
         (should-not-contain "" (texts log))
         (should-contain "Crap" (texts log))
         (reset! log [])
+        (call 'draw-detail-row {:kind :group-header :text "" :y 0 :h 18} false)
+        (should-contain "--crap--" (texts log))
+        (should-contain "--mutation--" (texts log))
+        (reset! log [])
         (with-redefs [detail/column-layout (fn [] [])]
           (call 'draw-detail-row {:kind :name :text "Z" :y 0 :h 22} false)
           (should-contain "Z" (texts log)))
@@ -454,20 +464,23 @@
         (call 'draw-detail-cells {:kind :stats} 10)
         (should= [] (of log :text)))))
 
-  (it "paints stats cells with coverage and survivor colors"
+  (it "paints stats cells with coverage and mutation colors"
     (record-quil
       (fn [log]
-        (call 'draw-detail-row {:kind :stats :text "go" :y 40 :h 18
-                                :op-name "go"
-                                :crap-s "1.8" :cc-s "2" :cov-s "75%"
-                                :killed-s "3" :survived-s "1"
-                                :coverage 0.75 :crap-n 1.8
-                                :killed 3 :survived 1} false)
-        (should-contain "go" (texts log))
-        (should-contain "75%" (texts log))
-        (should-contain "1" (texts log))
-        (should (painted? log :fill (draw/coverage-ink 0.75)))
-        (should (painted? log :fill [224 122 74]))))))
+        (let [row {:kind :stats :text "go" :y 40 :h 18
+                   :op-name "go"
+                   :crap-s "1.8" :cc-s "2" :cov-s "75%"
+                   :killed-s "3" :survived-s "1"
+                   :coverage 0.75 :crap-n 1.8
+                   :killed 3 :survived 1}]
+          (call 'draw-detail-row row false)
+          (should-contain "go" (texts log))
+          (should-contain "75%" (texts log))
+          (should-contain "1" (texts log))
+          (should (painted? log :fill (draw/coverage-ink 0.75)))
+          (should (painted? log :fill (draw/stroke-for
+                                       (config/mutation-grade
+                                         (config/mutation-ratio row))))))))))
 
 (describe "draw-state"
   (it "paints titles, skips dummy classes, and translates the camera"
@@ -489,6 +502,7 @@
           (should-contain :background (kinds log))
           (should-contain :push-matrix (kinds log))
           (should-contain :pop-matrix (kinds log))
+          (should-contain [:scale 1.0] @log)
           (should-contain [:translate -7 -9] @log)
           (should-contain "Inspector" (texts log))
           (should-contain "Tiny" (texts log))

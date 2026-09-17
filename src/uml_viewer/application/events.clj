@@ -74,8 +74,19 @@
     (select-class state id)
     state))
 
+(def zoom-step 1.1)
+(def zoom-min 0.1)
+(def zoom-max 10.0)
+
+(defn zoom-of
+  "Current diagram scale. 1 is unzoomed."
+  [state]
+  (double (or (:zoom state) 1.0)))
+
 (defn world-xy [state x y]
-  [(+ x (:cam-x state)) (+ y (:cam-y state))])
+  (let [z (zoom-of state)]
+    [(+ (:cam-x state 0) (/ (double x) z))
+     (+ (:cam-y state 0) (/ (double y) z))]))
 
 (defn on-move [state x y]
   (let [[wx wy] (world-xy state x y)]
@@ -100,6 +111,7 @@
         window-w (or (:window-w opts) 1500)
         window-h (or (:window-h opts) 900)
         view-w (or (:view-w opts) window-w)
+        z (zoom-of state)
         amount (cond
                  (number? amount) amount
                  (map? amount) (or (:count amount) 0)
@@ -107,22 +119,77 @@
         size (get-in state [:scene :size] {:w 800 :h 600})
         min-x (or (:min-x size) 0)
         min-y (or (:min-y size) 0)
-        max-x (max min-x (- (:w size) view-w))
-        max-y (max min-y (- (:h size) window-h))]
+        vis-w (/ (double view-w) z)
+        vis-h (/ (double window-h) z)
+        max-x (max min-x (- (:w size) vis-w))
+        max-y (max min-y (- (:h size) vis-h))
+        delta (/ (* amount 48.0) z)]
     (if horizontal?
-      (update state :cam-x #(max min-x (min max-x (+ % (* amount 48)))))
-      (update state :cam-y #(max min-y (min max-y (+ % (* amount 48))))))))
+      (update state :cam-x #(max min-x (min max-x (+ % delta))))
+      (update state :cam-y #(max min-y (min max-y (+ % delta)))))))
+
+(defn- view-center [state dims]
+  (let [z (zoom-of state)
+        vw (or (:view-w dims) (:window-w dims) 1500)
+        vh (or (:window-h dims) 900)]
+    [(+ (:cam-x state 0) (/ (double vw) 2.0 z))
+     (+ (:cam-y state 0) (/ (double vh) 2.0 z))]))
+
+(defn- set-zoom
+  "Set zoom, keeping the world point at the view center still."
+  [state z dims]
+  (let [z (max zoom-min (min zoom-max (double z)))
+        [cx cy] (view-center state dims)
+        vw (or (:view-w dims) (:window-w dims) 1500)
+        vh (or (:window-h dims) 900)]
+    (assoc state
+      :zoom z
+      :cam-x (- cx (/ (double vw) 2.0 z))
+      :cam-y (- cy (/ (double vh) 2.0 z)))))
+
+(defn- raw-char [raw]
+  (cond
+    (char? raw) raw
+    (string? raw) (first raw)
+    :else nil))
+
+(defn- key-name [k]
+  (cond
+    (keyword? k) (name k)
+    (char? k) (str k)
+    (string? k) k
+    :else nil))
+
+(defn zoom-dir
+  "`:in`, `:out`, or `:reset` for a ctrl zoom key; nil otherwise.
+  Ctrl-minus is often `:unknown-key` with key-code 45, not `:-`."
+  [k dims]
+  (let [n (key-name k)
+        code (or (:key-code dims) 0)
+        ch (raw-char (:raw-key dims))]
+    (cond
+      (or (#{"+" "="} n) (#{61 107 521} code) (#{\+ \=} ch)) :in
+      (or (#{"-" "_" "minus" "subtract"} n)
+          (#{45 109} code)
+          (#{\- \_ \u001f} ch)) :out
+      (or (= n "0") (#{48 96} code) (= ch \0)) :reset
+      :else nil)))
 
 (defn on-key
   ([state k] (on-key state k {:window-w 1500 :window-h 900}))
   ([state k dims]
-   (case k
-     :left (on-scroll state -2 (assoc dims :horizontal? true))
-     :right (on-scroll state 2 (assoc dims :horizontal? true))
-     :up (on-scroll state -2 dims)
-     :down (on-scroll state 2 dims)
-     :esc (if (seq (:focus state))
-            (back state)
-            (assoc state :selected nil))
-     :r (-> state (dissoc :waiting) (assoc :mtime 0))
-     state)))
+   (if-let [dir (and (:control? dims) (zoom-dir k dims))]
+     (case dir
+       :in (set-zoom state (* (zoom-of state) zoom-step) dims)
+       :out (set-zoom state (/ (zoom-of state) zoom-step) dims)
+       :reset (set-zoom state 1.0 dims))
+     (case k
+       :left (on-scroll state -2 (assoc dims :horizontal? true))
+       :right (on-scroll state 2 (assoc dims :horizontal? true))
+       :up (on-scroll state -2 dims)
+       :down (on-scroll state 2 dims)
+       :esc (if (seq (:focus state))
+              (back state)
+              (assoc state :selected nil))
+       :r (-> state (dissoc :waiting) (assoc :mtime 0))
+       state))))

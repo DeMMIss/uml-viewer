@@ -1,5 +1,5 @@
 (ns uml-viewer.clojure-language.graph-clojure
-  "Clojure LanguageGraph: ns requires, defprotocol, defrecord/deftype."
+  "Clojure LanguageGraph: ns requires, requiring-resolve, defprotocol, defrecord/deftype."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [uml-viewer.graph :as graph])
@@ -108,6 +108,27 @@
               (remove #(= % current-ns)))
         forms))
 
+(defn- walk-forms [x]
+  (tree-seq sequential? seq x))
+
+(defn- requiring-resolve-op? [op]
+  (and (symbol? op)
+       (= "requiring-resolve" (name op))))
+
+(defn- quoted-symbol [x]
+  (cond
+    (qualified-symbol? x) x
+    (and (seq? x) (= 'quote (first x)) (symbol? (second x))) (second x)
+    :else nil))
+
+(defn- requiring-resolve-libs [forms aliases]
+  (into []
+        (comp (filter seq?)
+              (filter #(requiring-resolve-op? (first %)))
+              (keep #(quoted-symbol (second %)))
+              (keep #(resolve-lib % aliases)))
+        (walk-forms forms)))
+
 (defn- interface? [forms]
   (boolean (some #(and (seq? %) (= 'defprotocol (first %))) forms)))
 
@@ -118,19 +139,21 @@
       (let [ns-str (str (second ns-form))
             specs (require-specs ns-form)
             aliases (aliases-of specs)
-            id (class-id ns-str prefix)]
+            id (class-id ns-str prefix)
+            libs (concat (map (comp str :lib) specs)
+                         (requiring-resolve-libs forms aliases))]
         {:id id
          :name (class-name id)
          :ns ns-str
          :stereotype (when (interface? forms) :interface)
-         :requires (->> specs
-                        (map :lib)
+         :requires (->> libs
+                        (map symbol)
                         (filter #(project-ns? % prefix))
                         (map #(class-id (str %) prefix))
                         (remove #(= % id))
+                        distinct
                         vec)
-         :foreign-requires (->> (concat (map (comp str :lib) specs)
-                                        (import-packages ns-form))
+         :foreign-requires (->> (concat libs (import-packages ns-form))
                                 (remove #(project-ns? (symbol %) prefix))
                                 distinct
                                 vec)

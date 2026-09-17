@@ -527,6 +527,7 @@
    (q/sketch
     :title "UML viewer"
     :size [window-width window-height]
+    :features [:resizable]
     :setup (fn [] (setup path restart?))
     :update #'update-state
     :draw #'draw/draw-state
@@ -535,6 +536,12 @@
                    (events/on-move state (:x event) (:y event)))
     :mouse-wheel #'on-main-wheel
     :key-pressed (fn [state event]
-                   (events/on-key state (:key event) (view-dims)))
+                   (events/on-key state (:key event)
+                                  (assoc (view-dims)
+                                    :control? (boolean
+                                                (some #{:control :ctrl}
+                                                      (:modifiers event)))
+                                    :key-code (:key-code event)
+                                    :raw-key (:raw-key event))))
     :on-close #'on-main-close
     :middleware [m/fun-mode])))
