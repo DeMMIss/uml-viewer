@@ -100,6 +100,28 @@
       (should= {:mu 8.0 :max 9.0 :sigma 2.0} (:crap source))
       (should= {:mu 2.0 :max 3.0 :sigma 1.0} (:crap layout))))
 
+  (it "rolls a parent layer's mutants up from the worst child ratio"
+    (let [g (update graph :classes
+                    (fn [cs]
+                      (mapv (fn [c]
+                              (case (:id c)
+                                :layout (assoc c :killed 9 :survived 1)
+                                :source.clojure (assoc c :killed 1 :survived 1)
+                                :source (assoc c :killed 8 :survived 0)
+                                :ir (assoc c :killed 4 :survived 0)
+                                c))
+                            cs)))
+          doc (policy/apply-policy policy g)
+          view (hierarchy/view-at doc [])
+          source (first (filter #(= :source (:id %))
+                                (mapcat :classes (:packages view))))
+          layout (first (filter #(= :layout (:id %))
+                                (mapcat :classes (:packages view))))]
+      (should= 1 (:killed source))
+      (should= 1 (:survived source))
+      (should= 9 (:killed layout))
+      (should= 1 (:survived layout))))
+
   (it "keeps arrows between classes in the same view"
     (let [g {:classes [{:id :engine :name "Engine" :ns "demo.engine"}
                        {:id :engine.layout :name "Layout" :ns "demo.engine.layout"}

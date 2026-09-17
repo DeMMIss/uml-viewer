@@ -1,5 +1,6 @@
 (ns uml-viewer.engine.layout
-  (:require [uml-viewer.domain.geom :as geom]))
+  (:require [uml-viewer.domain.config :as config]
+            [uml-viewer.domain.geom :as geom]))
 
 (def char-w 8)
 (def line-h 18)
@@ -47,8 +48,7 @@
     (str "«" (name st) "»")))
 
 (defn class-lines [c]
-  (let [crap (format-crap (:crap c))
-        contents (:contents c)
+  (let [contents (:contents c)
         fields (when (and (not (:hide-members c)) (empty? contents))
                  (mapv :text (or (:fields c) [])))
         ops (when (and (not (:hide-members c)) (empty? contents))
@@ -56,7 +56,6 @@
     (cond-> []
       (stereotype-line c) (conj {:kind :stereo :text (stereotype-line c)})
       true (conj {:kind :name :text (:name c)})
-      crap (conj {:kind :crap :text crap})
       (seq contents) (conj {:kind :rule :text nil})
       (seq contents) (into (map (fn [ch]
                                   {:kind :child
@@ -299,6 +298,10 @@
           [0 []]
           groups)))))
 
+(defn- mutant-pair [c]
+  (when (or (:killed c) (:survived c))
+    (select-keys c [:killed :survived])))
+
 (defn- layout-package [pkg origin-x origin-y edges direction rank-base]
   (let [inner (place-classes (:classes pkg) edges direction)
         inner (mapv #(layout-ports
@@ -310,9 +313,10 @@
                                           (get-in % [:rect :w])
                                           (get-in % [:rect :h]))))
                     inner)
-        title (str (:label pkg)
-                   (when-let [c (format-crap (:crap pkg))]
-                     (str "    " c)))
+        title (:label pkg)
+        crap (or (reduce config/worse-crap nil (keep :crap inner))
+                 (:crap pkg))
+        mut (reduce config/worse-mutants nil (keep mutant-pair inner))
         body (or (geom/union
                    (mapcat (fn [c]
                              (concat [(:rect c)]
@@ -327,12 +331,13 @@
                     180)
         pack-h (- (+ (geom/bottom body) pad) origin-y)
         pack-rect (geom/rect origin-x origin-y pack-w pack-h)]
-    {:id (:id pkg)
-     :label (:label pkg)
-     :crap (:crap pkg)
-     :title title
-     :rect pack-rect
-     :classes inner}))
+    (cond-> {:id (:id pkg)
+             :label (:label pkg)
+             :title title
+             :rect pack-rect
+             :classes inner}
+      crap (assoc :crap crap)
+      mut (assoc :killed (:killed mut) :survived (:survived mut)))))
 
 (defn- oval-size [c]
   (let [w (max 80 (+ (* 2 pad) (text-w (:name c))))

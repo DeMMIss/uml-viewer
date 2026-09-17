@@ -101,6 +101,36 @@
       (should (some #{"show"} texts))
       (should-not (some #{"hide"} texts))))
 
+  (it "omits μ/max/σ from the class box"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :a :name "A"
+                            :crap {:mu 1.2 :max 2.0 :sigma 0.4}}]}]
+               :edges []})
+          texts (keep :text (layout/class-lines (get-in d [:packages 0 :classes 0])))]
+      (should (some #{"A"} texts))
+      (should-not (some #(re-find #"μ" %) texts))))
+
+  (it "paints a package title without μ/max/σ and inherits the worst child colors"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :a :name "A"
+                            :crap {:mu 2.0 :max 2.0 :sigma 0}
+                            :killed 9 :survived 1}
+                           {:id :b :name "B"
+                            :crap {:mu 20.0 :max 20.0 :sigma 0}
+                            :killed 1 :survived 1}]}]
+               :edges []})
+          scene (layout/layout d)
+          p (first (:packages scene))]
+      (should= "P" (:title p))
+      (should-not (re-find #"μ" (or (:title p) "")))
+      (should= 20.0 (get-in p [:crap :mu]))
+      (should= 1 (:killed p))
+      (should= 1 (:survived p))))
+
   (it "lays an LR hub to the left of its targets"
     (let [scene (layout/layout hub)
           h (first (filter #(= :hub (:id %)) (:classes scene)))

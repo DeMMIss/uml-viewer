@@ -5,6 +5,7 @@
             [uml-viewer.application.document :as document]
             [uml-viewer.adapters.draw :as draw]
             [uml-viewer.engine.compose :as compose]
+            [uml-viewer.domain.config :as config]
             [uml-viewer.domain.ir :as ir]
             [uml-viewer.engine.layout :as layout]))
 
@@ -84,7 +85,6 @@
    :crap {:mu 1 :max 1 :sigma 0}
    :rect {:x 10 :y 20 :w 100 :h 90}
    :lines [{:kind :name :text "A"}
-           {:kind :crap :text "μ 1.0"}
            {:kind :stereo :text "«bean»"}
            {:kind :rule}
            {:kind :op :text "go()"}]})
@@ -108,13 +108,13 @@
     (let [high {:coverage 0.9 :crap-n 0 :survived 0 :killed 4}
           low {:coverage 0.2 :crap-n 24 :survived 2}]
       (should= (draw/coverage-ink 0.9) (call 'cell-color high {:id :cov}))
-      (should= (draw/stroke-for {:mu 0}) (call 'cell-color high {:id :crap}))
+      (should= (draw/stroke-for (config/crap-grade 0)) (call 'cell-color high {:id :crap}))
       (should= draw/muted (call 'cell-color high {:id :survived}))
       (should= draw/muted (call 'cell-color high {:id :killed}))
       (should= draw/muted (call 'cell-color high {:id :cc}))
       (should= draw/muted (call 'cell-color high {:id :name}))
       (should= [224 122 74] (call 'cell-color low {:id :survived}))
-      (should= (draw/stroke-for {:mu 24}) (call 'cell-color low {:id :crap}))
+      (should= (draw/stroke-for (config/crap-grade 24)) (call 'cell-color low {:id :crap}))
       (should= (draw/coverage-ink 0.2) (call 'cell-color low {:id :cov})))))
 
 (describe "obstacle-rects"
@@ -197,8 +197,10 @@
         (should-contain "P" (texts log))
         (reset! log [])
         (call 'draw-package (a-package) false)
-        (should (painted? log :stroke (draw/stroke-for {:mu 2 :max 2 :sigma 0})))
-        (should-contain [:stroke-weight 1.4] @log)))))
+        (should (painted? log :stroke (draw/stroke-for (draw/grade-of (a-package)))))
+        (should-contain [:stroke-weight 1.4] @log)
+        (should-contain "C" (texts log))
+        (should-contain "M" (texts log))))))
 
 (describe "class-line-ink"
   (it "maps line kinds onto theme inks"
@@ -213,10 +215,9 @@
     (record-quil
       (fn [log]
         (let [r {:x 10 :y 20 :w 100 :h 90}
-              crap {:mu 1 :max 1 :sigma 0}
               y 40]
-          (should= (+ y layout/pad) (call 'draw-rule r crap y))
-          (should (painted? log :stroke (draw/stroke-for crap)))
+          (should= (+ y layout/pad) (call 'draw-rule r 10.0 y))
+          (should (painted? log :stroke (draw/stroke-for 10.0)))
           (should-contain [:stroke-weight 1] @log)
           (should-contain [:line 16 44 104 44] @log))))))
 
@@ -246,13 +247,12 @@
     (record-quil
       (fn [log]
         (let [r {:x 10 :y 20 :w 100 :h 90}
-              crap {:mu 1 :max 1 :sigma 0}
               y 40]
-          (should= (+ y layout/pad) (call 'draw-class-line r crap {:kind :rule} y))
+          (should= (+ y layout/pad) (call 'draw-class-line r 10.0 {:kind :rule} y))
           (should-contain [:line 16 44 104 44] @log)
           (reset! log [])
           (should= (+ y layout/line-h)
-                   (call 'draw-class-line r crap {:kind :name :text "A"} y))
+                   (call 'draw-class-line r 10.0 {:kind :name :text "A"} y))
           (should-contain "A" (texts log))
           (should-not-contain :line (kinds log)))))))
 
@@ -305,18 +305,21 @@
         (should-contain [:stroke-weight 1.3] @log)
         (reset! log [])
         (call 'draw-class (a-class) false false)
-        (should (painted? log :stroke (draw/stroke-for {:mu 1 :max 1 :sigma 0}))))))
+        (should (painted? log :stroke (draw/stroke-for (draw/grade-of (a-class))))))))
 
-  (it "paints name, CRAP, stereo, a rule, and member text"
+  (it "paints name, stereo, a rule, member text, and C/M dots"
     (record-quil
       (fn [log]
         (call 'draw-class (a-class) false false)
         (should-contain "A" (texts log))
-        (should-contain "μ 1.0" (texts log))
+        (should-not-contain "μ 1.0" (texts log))
         (should-contain "«bean»" (texts log))
         (should-contain "go()" (texts log))
+        (should-contain "C" (texts log))
+        (should-contain "M" (texts log))
         (should-not-contain "α" (texts log))
         (should (some #{:line} (kinds log)))
+        (should (some #{:ellipse} (kinds log)))
         (should-contain [:text-size 14] @log)
         (should-contain [:text-size 12] @log))))
 
@@ -327,7 +330,8 @@
         (should-contain "α" (texts log))
         (should (painted? log :fill [255 255 255]))
         (should-contain [:text-align :right :top] @log)
-        (should-contain [:text "α" 104 24] @log))))
+        (let [cx (first (:c (call 'dot-centers (:rect (a-class)))))]
+          (should-contain [:text "α" (- cx 10) 24] @log)))))
 
   (it "uses italics for names of non-class rectangles"
     (should-not (call 'italic-name? (a-class)))
@@ -343,7 +347,8 @@
         (should-contain "I" (texts log))
         (should-not-contain "α" (texts log))
         (should (painted? log :fill [255 255 255]))
-        (should-contain [:text "I" 104 24] @log))))
+        (let [cx (first (:c (call 'dot-centers (:rect (a-class)))))]
+          (should-contain [:text "I" (- cx 10) 24] @log)))))
 
   (it "paints a foreign dependency as an oval"
     (record-quil
@@ -515,23 +520,30 @@
           (should (painted? log :fill [232 196 72]))
           (should-contain "+ go(x) : void" (texts log)))))))
 
-(describe "CRAP colors"
-  (it "uses a default fill when mu is missing"
-    (should= [36 52 48] (draw/fill-for nil))
-    (should= [36 52 48] (draw/fill-for {})))
+(describe "red-green grades"
+  (it "uses a default fill when the grade is missing"
+    (should= [36 52 48] (draw/fill-for nil)))
 
-  (it "is green at μ+σ = 0, gold at 12, rust at 24 and above"
-    (should= [30 74 56] (draw/fill-for {:mu 0 :sigma 0}))
-    (should= [61 58 24] (draw/fill-for {:mu 12}))
-    (should= [61 58 24] (draw/fill-for {:mu 6 :sigma 6}))
-    (should= [74 40 24] (draw/fill-for {:mu 24}))
-    (should= [74 40 24] (draw/fill-for {:mu 100})))
+  (it "is red at 0, gold at 5, green at 10"
+    (should= [74 40 24] (draw/fill-for 0))
+    (should= [61 58 24] (draw/fill-for 5))
+    (should= [30 74 56] (draw/fill-for 10)))
 
-  (it "strokes the same μ+σ ramp"
+  (it "strokes the same 0–10 ramp"
     (should= [90 110 100] (draw/stroke-for nil))
-    (should= [95 181 138] (draw/stroke-for {:mu 0}))
-    (should= [212 192 90] (draw/stroke-for {:mu 12 :sigma 0}))
-    (should= [224 122 74] (draw/stroke-for {:mu 24}))))
+    (should= [224 122 74] (draw/stroke-for 0))
+    (should= [212 192 90] (draw/stroke-for 5))
+    (should= [95 181 138] (draw/stroke-for 10)))
+
+  (it "averages CRAP and mutation grades on a box"
+    (let [good {:crap {:mu 8 :sigma 0} :killed 10 :survived 0}
+          mixed {:crap {:mu 8 :sigma 0} :killed 8 :survived 2}
+          bad {:crap {:mu 20 :sigma 0} :killed 8 :survived 2}]
+      (should= 10.0 (draw/grade-of good))
+      (should= 5.5 (draw/grade-of mixed))
+      (should= 1.0 (draw/grade-of bad))
+      (should= 10.0 (draw/grade-of {:crap {:mu 1 :sigma 0}}))
+      (should-be-nil (draw/grade-of {})))))
 
 (describe "coverage colors"
   (it "bands ink by coverage, high to low"

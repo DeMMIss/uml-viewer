@@ -1,6 +1,7 @@
 (ns uml-viewer.domain.hierarchy
   "Namespace-tree views: one level of children, collapsed inter-layer edges."
   (:require [clojure.string :as str]
+            [uml-viewer.domain.config :as config]
             [uml-viewer.domain.policy :as policy]))
 
 (defn- as-id [x]
@@ -72,42 +73,44 @@
                             (has-descendants? cid classes))})
             kids))))
 
-(defn- crap-risk [crap]
-  (when (:mu crap)
-    (+ (double (:mu crap)) (double (or (:sigma crap) 0)))))
-
-(defn- worse-crap [a b]
-  (let [ra (crap-risk a)
-        rb (crap-risk b)]
-    (cond
-      (nil? ra) b
-      (nil? rb) a
-      (> ra rb) a
-      :else b)))
+(defn- under-id? [c id]
+  (let [pfx (str (name id) ".")]
+    (or (= id (:id c))
+        (str/starts-with? (name (:id c)) pfx))))
 
 (defn- rolled-crap
   "Worst (μ+σ) among `id` and its descendants."
   [classes id]
-  (let [pfx (str (name id) ".")]
-    (reduce worse-crap nil
-            (keep (fn [c]
-                    (when (or (= id (:id c))
-                              (str/starts-with? (name (:id c)) pfx))
-                      (:crap c)))
-                  classes))))
+  (reduce config/worse-crap nil
+          (keep (fn [c]
+                  (when (under-id? c id)
+                    (:crap c)))
+                classes)))
+
+(defn- rolled-mutants
+  "Worst mutation ratio among `id` and its descendants."
+  [classes id]
+  (reduce config/worse-mutants nil
+          (keep (fn [c]
+                  (when (and (under-id? c id)
+                             (or (:killed c) (:survived c)))
+                    (select-keys c [:killed :survived])))
+                classes)))
 
 (defn- view-class [idx classes path id]
   (let [leaf (get idx id)
         kids (contents-of classes path id)
         drill? (boolean (seq kids))
         hide? drill?
-        crap (rolled-crap classes id)]
+        crap (rolled-crap classes id)
+        mut (rolled-mutants classes id)]
     (cond-> {:id id
              :name (or (:name leaf) (node-label id))
              :drill? drill?}
       (:ns leaf) (assoc :ns (:ns leaf))
       (:stereotype leaf) (assoc :stereotype (:stereotype leaf))
       crap (assoc :crap crap)
+      mut (assoc :killed (:killed mut) :survived (:survived mut))
       (:coverage leaf) (assoc :coverage (:coverage leaf))
       (:ops leaf) (assoc :ops (:ops leaf))
       (:fields leaf) (assoc :fields (:fields leaf))

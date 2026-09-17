@@ -54,9 +54,9 @@ clj -M:crap                          # writes .metrics/crap.edn
 clj -M:mutate src/uml_viewer/engine/layout.clj
 ```
 
-This project's `:crap` and `:mutate` aliases use `../clojure/crap4clj` and
-`../clojure/clj-mutate`. Commit `.metrics/` so a clone has numbers without
-re-running those tools.
+This project's `:crap` alias uses `../clojure/crap4clj`. `:mutate` pins
+[clj-mutate](https://github.com/unclebob/clj-mutate) by git SHA. Commit
+`.metrics/` so a clone has numbers without re-running those tools.
 
 Rename or move of a function is a new form: overlay does not match old names.
 
@@ -263,8 +263,11 @@ Optional authored metrics, used when snapshots are missing:
 - `:cc`, `:killed`, `:survived`, `:private` on ops
 - `:hide-members true` — compact box
 
-Package and class **color** uses `μ + σ` from the class `:crap` map (after
-overlay): green at 0, gold at 12, rust at 24 and above.
+Package and class **color** maps CRAP (`μ + σ`) and mutation score each onto
+1–10 using `uml-viewer.domain.config` cutoffs, averages them, and paints a
+0–10 red–green fill. Parents take the worst CRAP and worst mutation of their
+children. A **C** and **M** dot in the upper-right show the two scores. The
+boxes no longer print μ / max / σ.
 
 On the class card, the class row shows average CRAP with a `μ` suffix and omits
 CC. Max on the header line is the worst function in the namespace, not a sum.

@@ -1,6 +1,7 @@
 (ns uml-viewer.adapters.draw
   (:require [clojure.string :as str]
             [quil.core :as q]
+            [uml-viewer.domain.config :as config]
             [uml-viewer.domain.geom :as geom]
             [uml-viewer.engine.curve :as curve]
             [uml-viewer.application.detail :as detail]
@@ -17,10 +18,6 @@
 (def gold [232 196 72])
 (def line [42 61 54])
 
-(defn- risk [crap]
-  (when-let [mu (:mu crap)]
-    (+ (double mu) (double (or (:sigma crap) 0)))))
-
 (defn- mix [a b t]
   (int (+ a (* t (- b a)) 0.5)))
 
@@ -29,18 +26,32 @@
    (mix (nth c1 1) (nth c2 1) t)
    (mix (nth c1 2) (nth c2 2) t)])
 
-(defn- ramp [crap none green mid red]
-  (let [r (risk crap)]
-    (cond
-      (nil? r) none
-      (<= r 12.0) (mix-rgb green mid (/ r 12.0))
-      :else (mix-rgb mid red (min 1.0 (/ (- r 12.0) 12.0))))))
+(defn- grade-ramp [g none red mid green]
+  (cond
+    (nil? g) none
+    (<= g 5.0) (mix-rgb red mid (/ (double g) 5.0))
+    :else (mix-rgb mid green (min 1.0 (/ (- (double g) 5.0) 5.0)))))
 
-(defn fill-for [crap]
-  (ramp crap [36 52 48] [30 74 56] [61 58 24] [74 40 24]))
+(defn fill-for
+  "RGB fill for a 0–10 red–green grade."
+  [grade]
+  (grade-ramp grade [36 52 48] [74 40 24] [61 58 24] [30 74 56]))
 
-(defn stroke-for [crap]
-  (ramp crap [90 110 100] [95 181 138] [212 192 90] [224 122 74]))
+(defn stroke-for
+  "RGB stroke for a 0–10 red–green grade."
+  [grade]
+  (grade-ramp grade [90 110 100] [224 122 74] [212 192 90] [95 181 138]))
+
+(defn crap-grade-of [m]
+  (config/crap-grade (config/crap-risk (:crap m))))
+
+(defn mutation-grade-of [m]
+  (config/mutation-grade (config/mutation-ratio m)))
+
+(defn grade-of
+  "Average of CRAP and mutation 1–10 grades on `m`."
+  [m]
+  (config/combined-grade (crap-grade-of m) (mutation-grade-of m)))
 
 (defn coverage-ink [p]
   (cond
@@ -147,11 +158,35 @@
         (let [st (some-> (:stereotype c) name)]
           (and st (not= "class" st))))))
 
+(def ^:private dot-size 12)
+(def ^:private dot-inset 10)
+(def ^:private dot-gap 14)
+
+(defn- dot-centers [r]
+  (let [y (+ (:y r) dot-inset)
+        mx (- (geom/right r) dot-inset)]
+    {:c [(- mx dot-gap) y]
+     :m [mx y]}))
+
+(defn- draw-metric-dot [[x y] ch grade]
+  (rgb (fill-for grade))
+  (stroke-rgb (stroke-for grade) 1)
+  (q/ellipse x y dot-size dot-size)
+  (q/text-align :center :center)
+  (q/text-size 9)
+  (rgb [255 255 255])
+  (q/text ch x y))
+
+(defn- draw-metric-dots [m r]
+  (let [dots (dot-centers r)]
+    (draw-metric-dot (:c dots) "C" (crap-grade-of m))
+    (draw-metric-dot (:m dots) "M" (mutation-grade-of m))))
+
 (defn- draw-package [p selected?]
   (let [r (:rect p)
-        crap (:crap p)]
-    (rgb (fill-for crap) 80)
-    (stroke-rgb (if selected? gold (stroke-for crap))
+        g (grade-of p)]
+    (rgb (fill-for g) 80)
+    (stroke-rgb (if selected? gold (stroke-for g))
                 (if selected? 2.5 1.4))
     (q/rect (:x r) (:y r) (:w r) (:h r) 8)
     (rgb gold)
@@ -159,7 +194,8 @@
     (q/text-size 14)
     (name-font! true)
     (q/text (:title p) (+ (:x r) layout/pad) (+ (:y r) (/ layout/banner-h 2)))
-    (name-font! false)))
+    (name-font! false)
+    (draw-metric-dots p r)))
 
 (defn- class-line-ink [kind]
   (case kind
@@ -168,8 +204,8 @@
     :child ink
     ink))
 
-(defn- draw-rule [r crap y]
-  (stroke-rgb (stroke-for crap) 1)
+(defn- draw-rule [r grade y]
+  (stroke-rgb (stroke-for grade) 1)
   (q/line (+ (:x r) 6) (+ y 4)
           (- (geom/right r) 6) (+ y 4))
   (+ y layout/pad))
@@ -198,13 +234,13 @@
        (= (:id line) (:id mark))))
 
 (defn- draw-class-line
-  ([r crap line y] (draw-class-line r crap line y nil nil false))
-  ([r crap line y hover selected] (draw-class-line r crap line y hover selected false))
-  ([r crap line y hover selected italic-name?]
+  ([r grade line y] (draw-class-line r grade line y nil nil false))
+  ([r grade line y hover selected] (draw-class-line r grade line y hover selected false))
+  ([r grade line y hover selected italic-name?]
    (when (or (highlight-child? line hover) (highlight-child? line selected))
      (draw-child-wash r y))
    (if (= :rule (:kind line))
-     (draw-rule r crap y)
+     (draw-rule r grade y)
      (draw-text-line r line y italic-name?))))
 
 (defn- port-marked? [p mark]
@@ -250,10 +286,11 @@
     nil))
 
 (defn- draw-corner-mark [r ch]
-  (q/text-align :right :top)
-  (q/text-size 12)
-  (rgb [255 255 255])
-  (q/text ch (- (geom/right r) 6) (+ (:y r) 4)))
+  (let [cx (first (:c (dot-centers r)))]
+    (q/text-align :right :top)
+    (q/text-size 12)
+    (rgb [255 255 255])
+    (q/text ch (- cx 10) (+ (:y r) 4))))
 
 (defn- draw-oval [c selected? hovered?]
   (let [r (:rect c)]
@@ -275,19 +312,20 @@
    (if (= :oval (:shape c))
      (draw-oval c selected? hovered?)
      (let [r (:rect c)
-           crap (:crap c)]
-       (rgb (fill-for crap))
+           g (grade-of c)]
+       (rgb (fill-for g))
        (stroke-rgb (cond
                      selected? gold
                      hovered? ink
-                     :else (stroke-for crap))
+                     :else (stroke-for g))
                    (if selected? 2.6 1.3))
        (q/rect (:x r) (:y r) (:w r) (:h r) 4)
        (draw-class-ports c hover selected)
-       (reduce (fn [y line] (draw-class-line r crap line y hover selected
+       (reduce (fn [y line] (draw-class-line r g line y hover selected
                                             (italic-name? c)))
                (+ (:y r) layout/pad 4)
                (:lines c))
+       (draw-metric-dots c r)
        (when-let [ch (corner-mark c)]
          (draw-corner-mark r ch))))))
 
@@ -465,7 +503,7 @@
 (defn- cell-color [row col]
   (case (:id col)
     :cov (coverage-ink (:coverage row))
-    :crap (stroke-for {:mu (:crap-n row)})
+    :crap (stroke-for (config/crap-grade (:crap-n row)))
     :survived (if (pos? (or (:survived row) 0))
                 [224 122 74]
                 muted)
