@@ -131,6 +131,38 @@
       (should= 1 (:killed p))
       (should= 1 (:survived p))))
 
+  (it "inherits red mutation when a child has no mutant data"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :a :name "A"
+                            :crap {:mu 2.0 :max 2.0 :sigma 0}
+                            :killed 9 :survived 1}
+                           {:id :b :name "B"
+                            :crap {:mu 20.0 :max 20.0 :sigma 0}}]}]
+               :edges []})
+          scene (layout/layout d)
+          p (first (:packages scene))]
+      (should= 20.0 (get-in p [:crap :mu]))
+      (should-be-nil (:killed p))
+      (should-be-nil (:survived p))))
+
+  (it "inherits red CRAP when a child has no CRAP data"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :a :name "A"
+                            :crap {:mu 2.0 :max 2.0 :sigma 0}
+                            :killed 9 :survived 1}
+                           {:id :b :name "B"
+                            :killed 1 :survived 1}]}]
+               :edges []})
+          scene (layout/layout d)
+          p (first (:packages scene))]
+      (should-be-nil (:crap p))
+      (should= 1 (:killed p))
+      (should= 1 (:survived p))))
+
   (it "lays an LR hub to the left of its targets"
     (let [scene (layout/layout hub)
           h (first (filter #(= :hub (:id %)) (:classes scene)))

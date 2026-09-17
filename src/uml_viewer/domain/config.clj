@@ -17,9 +17,10 @@
 (def grade-worst 1.0)
 
 (defn crap-band
-  "Traffic light for a CRAP score. Nil when score is missing."
+  "Traffic light for a CRAP score. Missing counts as red."
   [score]
-  (when (some? score)
+  (if (nil? score)
+    :red
     (let [{:keys [green yellow]} crap-thresholds]
       (cond
         (<= score green) :green
@@ -27,9 +28,10 @@
         :else :red))))
 
 (defn mutation-band
-  "Traffic light for a mutation score in 0–1. Nil when score is missing."
+  "Traffic light for a mutation score in 0–1. Missing counts as red."
   [score]
-  (when (some? score)
+  (if (nil? score)
+    :red
     (let [{:keys [red yellow]} mutation-thresholds]
       (cond
         (<= score red) :red
@@ -59,9 +61,10 @@
     (+ (double (:mu crap)) (double (or (:sigma crap) 0)))))
 
 (defn crap-grade
-  "CRAP μ+σ on the 1–10 scale (10 is best). Nil when score is missing."
+  "CRAP μ+σ on the 1–10 scale (10 is best). Missing counts as red (1)."
   [score]
-  (when (some? score)
+  (if (nil? score)
+    grade-worst
     (let [{:keys [green yellow red]} crap-thresholds]
       (along (double score) green yellow red
              grade-best grade-mid grade-worst))))
@@ -78,9 +81,10 @@
             (/ (double (or k 0)) n)))))))
 
 (defn mutation-grade
-  "Mutation ratio on the 1–10 scale (10 is best). Nil when score is missing."
+  "Mutation ratio on the 1–10 scale (10 is best). Missing counts as red (1)."
   [score]
-  (when (some? score)
+  (if (nil? score)
+    grade-worst
     (let [{:keys [red yellow green]} mutation-thresholds]
       (along (double score) red yellow green
              grade-worst grade-mid grade-best))))
@@ -93,23 +97,33 @@
       (/ (double (reduce + xs)) (count xs)))))
 
 (defn worse-crap
-  "The CRAP map with higher μ+σ."
+  "The CRAP map with higher μ+σ.
+  Nil is no candidate yet. A map with no μ counts as red."
   [a b]
-  (let [ra (crap-risk a)
-        rb (crap-risk b)]
-    (cond
-      (nil? ra) b
-      (nil? rb) a
-      (> ra rb) a
-      :else b)))
+  (cond
+    (nil? a) b
+    (nil? b) a
+    :else
+    (let [ra (crap-risk a)
+          rb (crap-risk b)]
+      (cond
+        (nil? ra) a
+        (nil? rb) b
+        (> ra rb) a
+        :else b))))
 
 (defn worse-mutants
-  "The killed/survived pair with the lower (worse) mutation ratio."
+  "The killed/survived pair with the lower (worse) mutation ratio.
+  Nil is no candidate yet. A pair with no ratio counts as red."
   [a b]
-  (let [ra (mutation-ratio a)
-        rb (mutation-ratio b)]
-    (cond
-      (nil? ra) b
-      (nil? rb) a
-      (< ra rb) a
-      :else b)))
+  (cond
+    (nil? a) b
+    (nil? b) a
+    :else
+    (let [ra (mutation-ratio a)
+          rb (mutation-ratio b)]
+      (cond
+        (nil? ra) a
+        (nil? rb) b
+        (< ra rb) a
+        :else b))))

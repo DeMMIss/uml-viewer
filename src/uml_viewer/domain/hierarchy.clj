@@ -79,23 +79,28 @@
         (str/starts-with? (name (:id c)) pfx))))
 
 (defn- rolled-crap
-  "Worst (μ+σ) among `id` and its descendants."
+  "Worst (μ+σ) among `id` and its descendants.
+  A class with no CRAP data counts as red."
   [classes id]
-  (reduce config/worse-crap nil
-          (keep (fn [c]
-                  (when (under-id? c id)
-                    (:crap c)))
-                classes)))
+  (let [worst (reduce config/worse-crap nil
+                      (keep (fn [c]
+                              (when (under-id? c id)
+                                (or (:crap c) {})))
+                            classes))]
+    (when (:mu worst)
+      worst)))
 
 (defn- rolled-mutants
-  "Worst mutation ratio among `id` and its descendants."
+  "Worst mutation ratio among `id` and its descendants.
+  A class with no mutant data counts as red."
   [classes id]
-  (reduce config/worse-mutants nil
-          (keep (fn [c]
-                  (when (and (under-id? c id)
-                             (or (:killed c) (:survived c)))
-                    (select-keys c [:killed :survived])))
-                classes)))
+  (let [worst (reduce config/worse-mutants nil
+                      (keep (fn [c]
+                              (when (under-id? c id)
+                                (select-keys c [:killed :survived])))
+                            classes))]
+    (when (or (:killed worst) (:survived worst))
+      worst)))
 
 (defn- view-class [idx classes path id]
   (let [leaf (get idx id)

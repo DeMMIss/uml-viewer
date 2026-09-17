@@ -542,8 +542,12 @@
       (should= 10.0 (draw/grade-of good))
       (should= 5.5 (draw/grade-of mixed))
       (should= 1.0 (draw/grade-of bad))
-      (should= 10.0 (draw/grade-of {:crap {:mu 1 :sigma 0}}))
-      (should-be-nil (draw/grade-of {})))))
+      (should= 5.5 (draw/grade-of {:crap {:mu 1 :sigma 0}}))
+      (should= 5.5 (draw/grade-of {:killed 10 :survived 0}))
+      (should= 1.0 (draw/grade-of {}))
+      (should= 1.0 (draw/crap-grade-of {}))
+      (should= 1.0 (draw/mutation-grade-of {}))
+      (should= 1.0 (draw/mutation-grade-of {:killed 0 :survived 0})))))
 
 (describe "coverage colors"
   (it "bands ink by coverage, high to low"

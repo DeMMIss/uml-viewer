@@ -88,6 +88,7 @@
                               (case (:id c)
                                 :layout (assoc c :crap {:mu 2.0 :max 3.0 :sigma 1.0})
                                 :source.clojure (assoc c :crap {:mu 8.0 :max 9.0 :sigma 2.0})
+                                :source (assoc c :crap {:mu 1.0 :max 1.0 :sigma 0.0})
                                 :ir (assoc c :crap {:mu 1.0 :max 1.0 :sigma 0.0})
                                 c))
                             cs)))
@@ -121,6 +122,44 @@
       (should= 1 (:survived source))
       (should= 9 (:killed layout))
       (should= 1 (:survived layout))))
+
+  (it "treats a child with no mutants as the worst (red) ratio"
+    (let [g (update graph :classes
+                    (fn [cs]
+                      (mapv (fn [c]
+                              (case (:id c)
+                                :layout (assoc c :killed 9 :survived 1)
+                                :source (assoc c :killed 8 :survived 0)
+                                c))
+                            cs)))
+          doc (policy/apply-policy policy g)
+          view (hierarchy/view-at doc [])
+          source (first (filter #(= :source (:id %))
+                                (mapcat :classes (:packages view))))
+          layout (first (filter #(= :layout (:id %))
+                                (mapcat :classes (:packages view))))]
+      (should-be-nil (:killed source))
+      (should-be-nil (:survived source))
+      (should= 9 (:killed layout))
+      (should= 1 (:survived layout))))
+
+  (it "treats a child with no CRAP as the worst (red) score"
+    (let [g (update graph :classes
+                    (fn [cs]
+                      (mapv (fn [c]
+                              (case (:id c)
+                                :layout (assoc c :crap {:mu 2.0 :max 3.0 :sigma 1.0})
+                                :source (assoc c :crap {:mu 1.0 :max 1.0 :sigma 0.0})
+                                c))
+                            cs)))
+          doc (policy/apply-policy policy g)
+          view (hierarchy/view-at doc [])
+          source (first (filter #(= :source (:id %))
+                                (mapcat :classes (:packages view))))
+          layout (first (filter #(= :layout (:id %))
+                                (mapcat :classes (:packages view))))]
+      (should-be-nil (:crap source))
+      (should= {:mu 2.0 :max 3.0 :sigma 1.0} (:crap layout))))
 
   (it "keeps arrows between classes in the same view"
     (let [g {:classes [{:id :engine :name "Engine" :ns "demo.engine"}

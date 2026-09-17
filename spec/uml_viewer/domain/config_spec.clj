@@ -8,8 +8,8 @@
     (should= 12 (:yellow config/crap-thresholds))
     (should= 20 (:red config/crap-thresholds)))
 
-  (it "bands a missing score as unknown"
-    (should-be-nil (config/crap-band nil)))
+  (it "bands a missing score as red"
+    (should= :red (config/crap-band nil)))
 
   (it "is green at or below 8"
     (should= :green (config/crap-band 0))
@@ -30,8 +30,8 @@
     (should= 0.90 (:yellow config/mutation-thresholds))
     (should= 1.00 (:green config/mutation-thresholds)))
 
-  (it "bands a missing score as unknown"
-    (should-be-nil (config/mutation-band nil)))
+  (it "bands a missing score as red"
+    (should= :red (config/mutation-band nil)))
 
   (it "is red at or below 80%"
     (should= :red (config/mutation-band 0))
@@ -58,8 +58,8 @@
   (it "interpolates between the stops"
     (should= 7.75 (config/crap-grade 10)))
 
-  (it "is nil when the score is missing"
-    (should-be-nil (config/crap-grade nil)))
+  (it "is red when the score is missing"
+    (should= 1.0 (config/crap-grade nil)))
 
   (it "reads μ+σ from a CRAP map"
     (should= 12.0 (config/crap-risk {:mu 6 :sigma 6}))
@@ -75,8 +75,8 @@
     (should= 1.0 (config/mutation-grade 0.0))
     (should= 10.0 (config/mutation-grade 1.00)))
 
-  (it "is nil when the score is missing"
-    (should-be-nil (config/mutation-grade nil)))
+  (it "is red when the score is missing"
+    (should= 1.0 (config/mutation-grade nil)))
 
   (it "is killed over killed plus survived"
     (should= 1.0 (config/mutation-ratio {:killed 4 :survived 0}))
@@ -103,9 +103,18 @@
     (should= {:mu 8} (config/worse-crap {:mu 8} nil))
     (should= {:mu 3} (config/worse-crap nil {:mu 3})))
 
+  (it "treats a class with no CRAP data as worse than any measured score"
+    (should= {} (config/worse-crap {:mu 8} {}))
+    (should= {} (config/worse-crap {} {:mu 8})))
+
   (it "picks the lower mutation ratio"
     (let [good {:killed 9 :survived 1}
           bad {:killed 1 :survived 1}]
       (should= bad (config/worse-mutants good bad))
       (should= good (config/worse-mutants good nil))
-      (should= bad (config/worse-mutants nil bad)))))
+      (should= bad (config/worse-mutants nil bad))))
+
+  (it "treats a class with no mutant data as worse than any measured ratio"
+    (let [good {:killed 9 :survived 1}]
+      (should= {} (config/worse-mutants good {}))
+      (should= {} (config/worse-mutants {} good)))))

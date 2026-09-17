@@ -299,8 +299,7 @@
           groups)))))
 
 (defn- mutant-pair [c]
-  (when (or (:killed c) (:survived c))
-    (select-keys c [:killed :survived])))
+  (select-keys c [:killed :survived]))
 
 (defn- layout-package [pkg origin-x origin-y edges direction rank-base]
   (let [inner (place-classes (:classes pkg) edges direction)
@@ -314,9 +313,13 @@
                                           (get-in % [:rect :h]))))
                     inner)
         title (:label pkg)
-        crap (or (reduce config/worse-crap nil (keep :crap inner))
-                 (:crap pkg))
-        mut (reduce config/worse-mutants nil (keep mutant-pair inner))
+        crap (let [worst (reduce config/worse-crap nil
+                                 (map (fn [c] (or (:crap c) {})) inner))]
+               (when (:mu worst)
+                 worst))
+        mut (let [worst (reduce config/worse-mutants nil (map mutant-pair inner))]
+              (when (or (:killed worst) (:survived worst))
+                worst))
         body (or (geom/union
                    (mapcat (fn [c]
                              (concat [(:rect c)]
