@@ -170,6 +170,18 @@
       (should= 5 (count targets))
       (should (every? #(< (geom/cx (:rect h)) (geom/cx (:rect %))) targets))))
 
+  (it "stacks a level-0 class below a higher level"
+    (let [d (ir/normalize
+              {:packages
+               [{:id :p :label "P"
+                 :classes [{:id :inner :name "Inner" :level 0}
+                           {:id :outer :name "Outer" :level 2}]}]
+               :edges []})
+          scene (layout/layout d)
+          inner (first (filter #(= :inner (:id %)) (:classes scene)))
+          outer (first (filter #(= :outer (:id %)) (:classes scene)))]
+      (should (< (:y (:rect outer)) (:y (:rect inner))))))
+
   (it "puts the parent package above the implementing child"
     (let [scene (layout/layout sample)
           top (first (filter #(= :top (:id %)) (:packages scene)))

@@ -21,6 +21,46 @@
   (let [x (+ (- window-w sidebar-w) 16)]
     {:x x :y (- window-h 56) :w (- sidebar-w 32) :h 32}))
 
+(def inspector-pad 16)
+(def inspector-row-h 22)
+(def inspector-btn-h 28)
+(def inspector-btn-gap 8)
+
+(defn inspector-x [window-w]
+  (+ (- window-w sidebar-w) inspector-pad))
+
+(defn inspector-inner-w []
+  (- sidebar-w (* 2 inspector-pad)))
+
+(defn proposal-row-rect
+  [window-w i]
+  {:x (inspector-x window-w)
+   :y (+ 48 (* i inspector-row-h))
+   :w (inspector-inner-w)
+   :h inspector-row-h})
+
+(defn new-proposal-rect
+  [window-w n]
+  {:x (inspector-x window-w)
+   :y (+ 48 (* n inspector-row-h) inspector-btn-gap)
+   :w (inspector-inner-w)
+   :h inspector-btn-h})
+
+(defn declutter-rect
+  [window-w n]
+  (let [nr (new-proposal-rect window-w n)]
+    (assoc nr :y (+ (:y nr) inspector-btn-h inspector-btn-gap))))
+
+(defn inspector-body-y
+  [n]
+  (let [d (declutter-rect 1500 (or n 0))]
+    (+ (:y d) inspector-btn-h 16)))
+
+(defn in-rect? [r x y]
+  (and r
+       (>= x (:x r)) (< x (+ (:x r) (:w r)))
+       (>= y (:y r)) (< y (+ (:y r) (:h r)))))
+
 (def under-gap 5)
 
 (defn text-w [s]
@@ -235,8 +275,14 @@
         ids (mapv :id sized)
         ranks (bfs-ranks ids edges)
         nbr (neighbors ids edges)
-        grouped (group-by ranks ids)
-        rank-keys (sort (keys grouped))
+        lr? (contains? #{:lr :rl} direction)
+        use-level? (and (not lr?) (some #(some? (:level %)) sized))
+        grouped (if use-level?
+                  (group-by #(or (:level (by-id %)) 0) ids)
+                  (group-by ranks ids))
+        rank-keys (if use-level?
+                    (sort-by - (keys grouped))
+                    (sort (keys grouped)))
         pos0 (into {} (map-indexed (fn [i id] [id (* i 80)]) ids))
         pos (loop [p pos0 k 0]
               (if (> k 4)
@@ -255,8 +301,7 @@
                           :items items
                           :w (apply max 0 (map :w items))
                           :h (apply max 0 (map :h items))}))
-                     rank-keys)
-        lr? (contains? #{:lr :rl} direction)]
+                     rank-keys)]
     (if lr?
       (let [cols (mapv (fn [g]
                          (let [h (+ (apply + (map :h (:items g)))
@@ -312,12 +357,14 @@
                                           (get-in % [:rect :w])
                                           (get-in % [:rect :h]))))
                     inner)
+        real (vec (remove :dummy? inner))
+        metric-src (if (seq real) real inner)
         title (:label pkg)
         crap (let [worst (reduce config/worse-crap nil
-                                 (map (fn [c] (or (:crap c) {})) inner))]
+                                 (map (fn [c] (or (:crap c) {})) metric-src))]
                (when (:mu worst)
                  worst))
-        mut (let [worst (reduce config/worse-mutants nil (map mutant-pair inner))]
+        mut (let [worst (reduce config/worse-mutants nil (map mutant-pair metric-src))]
               (when (or (:killed worst) (:survived worst))
                 worst))
         body (or (geom/union
@@ -325,7 +372,7 @@
                              (concat [(:rect c)]
                                      (map :rect (:in-ports c))
                                      (map :rect (:out-ports c))))
-                           inner))
+                           real))
                  (geom/rect (+ origin-x pad)
                             (+ origin-y banner-h pad)
                             160 40))
@@ -333,7 +380,12 @@
                     (+ (* 2 pad) (text-w title))
                     180)
         pack-h (- (+ (geom/bottom body) pad) origin-y)
-        pack-rect (geom/rect origin-x origin-y pack-w pack-h)]
+        pack-rect (geom/rect origin-x origin-y pack-w pack-h)
+        inner (mapv (fn [c]
+                      (if (:dummy? c)
+                        (layout-ports (assoc c :rect pack-rect :package (:id pkg)))
+                        c))
+                    inner)]
     (cond-> {:id (:id pkg)
              :label (:label pkg)
              :title title

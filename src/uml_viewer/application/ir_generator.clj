@@ -33,7 +33,8 @@
                            (or (:src policy) "src")
                            {:prefix (or (:prefix policy) "uml-viewer")})
          extra (policy/unassigned policy graph)
-         doc (policy/apply-policy policy graph)
+         doc (assoc (policy/apply-policy policy graph)
+               :policy-file policy-path)
          out (or out-path (:out policy) "examples/uml-viewer.edn")]
      (when (seq extra)
        (binding [*out* *err*]

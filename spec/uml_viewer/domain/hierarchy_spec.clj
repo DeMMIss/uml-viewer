@@ -23,6 +23,77 @@
    :foreign [:quil :javax.swing]
    :order [:source :layout :ir]})
 
+(describe "hierarchy proposal"
+  (it "groups top-level nses into named packages and marks the view as a proposal"
+    (let [p (assoc policy
+              :order [:source :layout :ir]
+              :proposal [{:id :kernel :label "Kernel" :nses [:ir :source]}
+                         {:id :engine :label "Engine" :nses [:layout]}])
+          doc (policy/apply-policy p graph)
+          view (hierarchy/proposal-view doc)
+          pkgs (:packages view)
+          ids (fn [pkg] (mapv :id (:classes pkg)))]
+      (should (:proposal view))
+      (should= policy/proposal-notice (:title view))
+      (should= [:proposal.engine :proposal.kernel] (mapv :id pkgs))
+      (should= ["Engine" "Kernel"] (mapv :label pkgs))
+      (should= [:layout] (ids (first pkgs)))
+      (should= [:ir :source] (ids (second pkgs)))
+      (should (some #(= :quil (:id %)) (:foreign view)))))
+
+  (it "puts leftover top-level nses in Unassigned"
+    (let [p (assoc policy
+              :proposal [{:id :engine :label "Engine" :nses [:layout]}])
+          doc (policy/apply-policy p graph)
+          view (hierarchy/proposal-view doc)
+          last-pkg (first (:packages view))]
+      (should= :proposal.unassigned (:id last-pkg))
+      (should= "Unassigned" (:label last-pkg))
+      (should (some #{:ir} (map :id (:classes last-pkg))))))
+
+  (it "collapses arrows between proposal packages to one per direction"
+    (let [p (assoc policy
+              :proposal [{:id :kernel :label "Kernel" :nses [:ir :source]}
+                         {:id :engine :label "Engine" :nses [:layout]}])
+          doc (policy/apply-policy p
+                                   (update graph :edges conj
+                                           {:from :ir :to :layout :kind :dependency}
+                                           {:from :source :to :layout :kind :association}))
+          view (hierarchy/apply-declutter (hierarchy/proposal-view doc) :arrows)
+          edges (:edges view)
+          e (first (filter #(and (= :proposal.kernel (:from %))
+                                 (= :proposal.engine (:to %)))
+                           edges))]
+      (should e)
+      (should (contains? (:via-ids e) :ir))
+      (should (contains? (:via-ids e) :source)))))
+
+  (it "hides methods then classes as declutter progresses"
+    (let [doc (policy/apply-policy policy graph)
+          methods (hierarchy/apply-declutter (hierarchy/view-at doc []) :methods)
+          classes (hierarchy/apply-declutter (hierarchy/view-at doc []) :classes)
+          box (fn [v] (first (:classes (first (:packages v)))))]
+      (should (:hide-members (box methods)))
+      (should (:hide-members (box classes)))
+      (should-not (seq (:contents (box classes))))))
+
+  (it "keeps rolled CRAP and mutation on a collapsed proposal layer"
+    (let [g (assoc graph :classes
+                   (mapv #(cond
+                            (= :ir (:id %)) (assoc % :crap {:mu 3.0 :max 3.0 :sigma 0} :killed 2 :survived 0)
+                            :else %)
+                         (:classes graph)))
+          p (assoc policy
+              :proposal [{:id :kernel :label "Kernel" :nses [:ir :source]}
+                         {:id :engine :label "Engine" :nses [:layout]}])
+          doc (policy/apply-policy p g)
+          view (hierarchy/apply-declutter (hierarchy/proposal-view doc) :classes)
+          kernel (first (filter #(= :proposal.kernel (:id %)) (:packages view)))
+          dummy (first (:classes kernel))]
+      (should (:dummy? dummy))
+      (should (:crap dummy))
+      (should= 2 (:killed dummy))))
+
 (describe "hierarchy"
   (it "collapses a violating leaf dependency onto the parent segments"
     (let [g (update graph :edges conj {:from :ir :to :layout :kind :dependency})

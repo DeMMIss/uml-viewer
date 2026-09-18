@@ -7,7 +7,8 @@
             [uml-viewer.application.detail :as detail]
             [uml-viewer.application.document :as document]
             [uml-viewer.engine.hit :as hit]
-            [uml-viewer.engine.layout :as layout])
+            [uml-viewer.engine.layout :as layout]
+            [uml-viewer.domain.hierarchy :as hierarchy])
   (:import [java.awt Font]
            [processing.core PFont]))
 
@@ -330,6 +331,11 @@
                      :else (stroke-for g))
                    (if selected? 2.6 1.3))
        (q/rect (:x r) (:y r) (:w r) (:h r) 4)
+       (when (some? (:level c))
+         (q/text-align :left :top)
+         (q/text-size 11)
+         (rgb muted)
+         (q/text (str (:level c)) (+ (:x r) 5) (+ (:y r) 3)))
        (draw-class-ports c hover selected)
        (reduce (fn [y line] (draw-class-line r g line y hover selected
                                             (italic-name? c)))
@@ -339,11 +345,29 @@
        (when-let [ch (corner-mark c)]
          (draw-corner-mark r ch))))))
 
-(defn- draw-sidebar-chrome []
+(def ^:private declutter-label
+  {:full "Full"
+   :arrows "Collapse arrows"
+   :methods "Collapse methods"
+   :classes "Collapse classes"})
+
+(defn- draw-btn [r label]
+  (rgb [42 61 54])
+  (q/no-stroke)
+  (q/rect (:x r) (:y r) (:w r) (:h r) 4)
+  (rgb gold)
+  (q/text-align :center :center)
+  (q/text-size 13)
+  (q/text label (geom/cx r) (geom/cy r)))
+
+(defn- draw-sidebar-chrome [state]
   (let [w (q/width)
         h (q/height)
         sw layout/sidebar-w
-        x (- w sw)]
+        x (- w sw)
+        ps (hierarchy/named-proposals (:doc state))
+        n (count ps)
+        selected (:proposal-id state)]
     (rgb [18 22 24] 230)
     (q/no-stroke)
     (q/rect x 0 sw h)
@@ -354,42 +378,68 @@
     (q/text-size 16)
     (rgb gold)
     (q/text "Inspector" (+ x 16) 16)
-    (q/text-size 13)
-    (rgb ink)
+    (q/text-size 11)
+    (rgb muted)
+    (q/text "Proposals" (+ x 16) 36)
+    (doseq [[i p] (map-indexed vector ps)
+            :let [r (layout/proposal-row-rect w i)]]
+      (when (= selected (:id p))
+        (rgb gold 40)
+        (q/no-stroke)
+        (q/rect (:x r) (:y r) (:w r) (:h r) 3))
+      (q/text-align :left :center)
+      (q/text-size 12)
+      (rgb (if (= selected (:id p)) gold ink))
+      (q/text (or (:name p) (name (:id p)))
+              (+ (:x r) 6) (geom/cy r)))
+    (draw-btn (layout/new-proposal-rect w n) "New")
+    (draw-btn (layout/declutter-rect w n)
+              (get declutter-label (or (:declutter state) :full) "Full"))
     x))
 
-(defn- draw-sidebar-empty [x]
+(defn- draw-sidebar-empty [x y]
   (rgb muted)
-  (q/text "Click a component for its card.\nDouble-click a layer to open it.\nEsc (or ←) goes up a level.\nScroll to pan; Shift-scroll for horizontal.\nCtrl+ / Ctrl- zoom 10%; Ctrl+0 resets.\nR reloads the EDN file."
-          (+ x 16) 48))
+  (q/text-align :left :top)
+  (q/text-size 12)
+  (q/text "Click a component for its card.\nDouble-click a layer to open it.\nEsc (or ←) goes up a level.\nScroll to pan; Shift-scroll for horizontal.\nCtrl+/− zoom 10%; Ctrl+0 resets.\nR reloads. P returns to the ns tree.\nClick a proposal to show it."
+          (+ x 16) y))
 
-(defn- draw-sidebar-class [x scene id]
+(defn- draw-sidebar-class [x y scene id]
   (when-let [c (hit/class-by-id scene id)]
-    (q/text (:name c) (+ x 16) 48)
+    (q/text-align :left :top)
+    (q/text-size 13)
+    (rgb ink)
+    (q/text (:name c) (+ x 16) y)
     (rgb muted)
     (q/text (if-let [p (:package c)]
               (str "package  " (name p))
               "foreign")
-            (+ x 16) 72)
+            (+ x 16) (+ y 18))
+    (when (some? (:level c))
+      (rgb muted)
+      (q/text (str "Level " (:level c)) (+ x 16) (+ y 36)))
     (when-let [s (layout/format-crap (:crap c))]
       (rgb gold)
-      (q/text s (+ x 16) 96))
+      (q/text s (+ x 16) (+ y 54)))
     (rgb ink)
     (q/text (str/join "\n" (keep :text (filter #(#{:field :op} (:kind %))
                                                (:lines c))))
-            (+ x 16) 128)))
+            (+ x 16) (+ y 78))))
 
-(defn- draw-sidebar-package [x scene id]
+(defn- draw-sidebar-package [x y scene id]
   (when-let [p (hit/package-by-id scene id)]
-    (q/text (:label p) (+ x 16) 48)
+    (q/text-align :left :top)
+    (q/text-size 13)
+    (rgb ink)
+    (q/text (:label p) (+ x 16) y)
     (when-let [s (layout/format-crap (:crap p))]
       (rgb gold)
-      (q/text s (+ x 16) 80))
+      (q/text s (+ x 16) (+ y 24)))
     (rgb muted)
     (q/text (str (count (filter #(= (:id p) (:package %))
                                 (:classes scene)))
                  " classes")
-            (+ x 16) 112)))
+            (+ x 16) (+ y 48))))
 
 (defn- draw-sidebar-error [x h err]
   (rgb [224 122 74])
@@ -411,13 +461,14 @@
       (q/text s (:x r) (- (:y r) 8)))))
 
 (defn- draw-sidebar [state]
-  (let [x (draw-sidebar-chrome)
+  (let [x (draw-sidebar-chrome state)
+        y (layout/inspector-body-y (count (hierarchy/named-proposals (:doc state))))
         sel (:selected state)
         scene (:scene state)]
     (case (:kind sel)
-      nil (draw-sidebar-empty x)
-      :class (draw-sidebar-class x scene (:id sel))
-      :package (draw-sidebar-package x scene (:id sel))
+      nil (draw-sidebar-empty x y)
+      :class (draw-sidebar-class x y scene (:id sel))
+      :package (draw-sidebar-package x y scene (:id sel))
       nil)
     (when-let [err (:error state)]
       (draw-sidebar-error x (q/height) err))
@@ -457,6 +508,7 @@
                  (= :class (:kind sel)) (:id sel)
                  (= :child (:kind sel)) (:parent sel)
                  (= :port (:kind sel)) (:parent sel)
+                 (= :package (:kind sel)) (:id sel)
                  :else nil)
         hover-id (cond
                    (= :class (:kind hover)) (:id hover)
@@ -478,7 +530,8 @@
             :when (let [b (:draw-bounds e)]
                     (or (nil? b) (in-view? b cam-x cam-y world-w world-h)))]
       (draw-edge e
-                 (or (= sel-id (:from e)) (= sel-id (:to e)))
+                 (or (= sel-id (:from e)) (= sel-id (:to e))
+                     (contains? (:via-ids e) sel-id))
                  scene))
     (doseq [c (remove :dummy? (:classes scene))
             :when (or (in-view? (:rect c) cam-x cam-y world-w world-h)
@@ -493,10 +546,21 @@
   (draw-sidebar state)
   (when (and (not (:waiting state))
              (get-in state [:scene :diagram :title]))
-    (rgb muted)
     (q/text-align :left :top)
-    (q/text-size 12)
-    (q/text (get-in state [:scene :diagram :title]) 12 8))
+    (if (get-in state [:scene :diagram :proposal])
+      (do
+        (rgb gold)
+        (q/text-size 16)
+        (q/text (or (get-in state [:scene :diagram :title])
+                    "PROPOSAL — not instantiated in code")
+                12 8)
+        (q/text-size 12)
+        (rgb muted)
+        (q/text "P returns to the namespace tree." 12 28))
+      (do
+        (rgb muted)
+        (q/text-size 12)
+        (q/text (get-in state [:scene :diagram :title]) 12 8))))
   (when (seq (:focus state))
     (rgb gold)
     (q/text-align :left :top)

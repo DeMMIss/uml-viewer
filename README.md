@@ -72,6 +72,10 @@ Rename or move of a function is a new form: overlay does not match old names.
   Dependencies between layers collapse to one arrow. Each layer lists nested
   namespaces.
 - Double-click a layer to open the next level. Esc or the ← label goes up.
+- The inspector lists **proposals**. Click one to show it (marked as not
+  in the code). **P** returns to the ns tree. **New** adds a timestamp-named
+  proposal. Right-click to rename or delete. **Declutter** cycles Full /
+  Collapse arrows / Collapse methods / Collapse classes.
 - Double-click a leaf module for its **class card**.
 - The class card names the **module** (`:ns`). Click it to open that source
   file at the top. Hover a member to highlight it; click it to open the same
@@ -112,7 +116,9 @@ The tree **is** the namespaces. After `:prefix`, every `.` is a nesting
 level. `uml-viewer.engine.layout` is a child of `engine`.
 `uml-viewer.clojure-language.source-clojure` is a child of `clojure-language`.
 The policy does **not** assign nses to invented packages. If you want Domain /
-Engine / Adapters boxes, those segments must exist as namespaces.
+Engine / Adapters boxes **in the source tree**, those segments must exist as
+namespaces. To **view** a grouping that is not in the code, use `:proposal`
+(see [Proposed layers](#proposed-layers)) — do not rewrite namespaces.
 
 To write a policy for a project:
 
@@ -127,7 +133,9 @@ To write a policy for a project:
    `clojure-language`).
 6. Set `:levels` so the generator can mark dependency-rule violations
    (see [Dependency rule](#dependency-rule)).
-7. Run `clj -M:ir` (or Regen).
+7. Optionally set `:proposal` to name design layers that are not namespaces
+   (see [Proposed layers](#proposed-layers)).
+8. Run `clj -M:ir` (or Regen).
 
 If `foo.bar` and `foo.bar.baz` both exist, the `bar` box lists `bar` (the
 module) and `baz` (the child). Double-click the layer to open that level;
@@ -165,6 +173,7 @@ Right (the ns tree):
 | `:hierarchical` | Namespace tree (default when `:packages` is omitted) |
 | `:order` | Order of **existing** top-level ns segments, not new layer names |
 | `:levels` | Groups of those segments, **inner (higher-level) first**. Same group = same rank |
+| `:proposals` | Named groupings of real segments; **not** instantiated in source. Inspector list; **P** returns to the ns tree |
 | `:edge-kinds` | Override parser kind for `[from to]` (usually `:association`) |
 | `:omit-edges` | Drop `[from to]` |
 | `:lang` | Which `LanguageGraph` to use (default `:clojure`) |
@@ -185,7 +194,10 @@ mutation because mutate exited non-zero.
 - Nested nses appear as contents of the parent layer.
 - “This require is really an association”: one `:edge-kinds` entry.
 - Show a library like quil as an oval: add it to `:foreign`.
-- Do not add `:packages` to fake Clean Architecture layers.
+- Do not add `:packages` to fake Clean Architecture layers. Use `:proposals`
+  to view a grouping that is not in the code.
+- Preserve `:proposals` when rewriting policy. Do not invent them on launch.
+  If instructed, add a named proposal (default name is a timestamp).
 
 Hand-written sample IRs (e.g. `examples/library.edn`) are still valid; they
 are not generated.
@@ -211,7 +223,40 @@ Evaluation is deterministic given `:levels`:
 `:order` is visual box order, not rank. Nesting is not layering: you cannot
 infer inner vs outer from the namespace tree alone, so `:levels` must group
 segments that sit at the same architectural level (e.g. `domain`, `source`,
-and `graph`). Omit `:levels` and nothing is marked.
+and `graph`). Omit `:levels` and nothing is marked. If `:levels` is omitted
+and `:proposals` is set, rank follows the first proposal's layer order.
+
+### Proposed layers
+
+`:proposals` is a list of named groupings of **existing** top-level segments.
+Those names are not namespaces. Each item is `{:id :name :layers [...]}`.
+The as-is diagram stays the ns tree. The inspector lists proposals; click one
+to show it (canvas marked **PROPOSAL — not instantiated in code**). **New**
+adds an empty proposal named with a timestamp. Right-click a name to rename
+or delete it. **P** returns to the tree. Double-click a ns box to drill the
+real tree.
+
+The **Declutter** button cycles **Full** → **Collapse arrows** (one arrow per
+layer pair per direction) → **Collapse methods** (also hide fields/ops) →
+**Collapse classes** (also hide classes inside layers).
+
+Class boxes show the `:levels` rank (innermost **0**) at the upper left; the
+class card repeats **Level n**. Level 0 is drawn at the **bottom**. Good
+arrows (outer → inner) point down; violating arrows (inner → outer) point
+up and stay red. When arrows are collapsed, selecting a class highlights
+the layer arrows it belongs to. Collapsed layers keep their color and C/M
+dots; double-click still opens a layer.
+
+```edn
+:proposals [{:id :ccp
+             :name "2026-09-18 10:30:00"
+             :layers [{:id :playfield :label "Playfield"
+                       :nses [entities world missiles cities batteries flyers]}
+                      {:id :hosts :label "Hosts" :nses [jvm browser]}]}]
+```
+
+Companion Grok must not invent `:proposals` on launch and must keep them when
+updating `:order`. If instructed, add a named proposal and regenerate the IR.
 
 The viewer draws a violating arrow **red**, and **bold red** when a selected
 element highlights it. Hand-written IR may set `:violating true` directly.

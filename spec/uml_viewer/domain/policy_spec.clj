@@ -114,6 +114,38 @@
                             (mapcat :classes (:packages layers))))]
       (should= "uml-viewer.domain.ir" (:ns ir))))
 
+  (it "normalizes :proposal layers and uses them for ranks when :levels is omitted"
+    (let [p {:proposal [{:id :playfield :label "Playfield" :nses [:entities :world]}
+                        {:id :hosts :label "Hosts" :nses [:jvm]}]}
+          n (policy/normalize-proposal (:proposal p))]
+      (should= policy/proposal-notice (:notice n))
+      (should= [:playfield :hosts] (mapv :id (:layers n)))
+      (should= {:entities 0 :world 0 :jvm 1} (policy/level-ranks p))
+      (should (policy/violating-dependency?
+                {:from :world :to :jvm :kind :dependency}
+                (policy/level-ranks p)))))
+
+  (it "copies :proposal onto a hierarchical IR"
+    (let [p {:title "T" :hierarchical true
+             :proposal [{:id :core :label "Facade" :nses [:ir]}]
+             :order [:ir]}
+          doc (policy/apply-policy p graph)]
+      (should= "Facade" (get-in doc [:proposal :layers 0 :label]))
+      (should= [:ir] (get-in doc [:proposal :layers 0 :nses]))
+      (should= [[:ir]] (:levels doc))))
+
+  (it "copies named :proposals and stamps :level from :levels"
+    (let [p {:title "T" :hierarchical true
+             :levels [[:ir] [:source]]
+             :proposals [{:id :ccp :name "2026-09-18 10:30:00"
+                          :layers [{:id :kernel :label "Kernel" :nses [:ir]}]}]
+             :order [:ir :source]}
+          doc (policy/apply-policy p graph)
+          ir (first (filter #(= :ir (:id %)) (:classes doc)))]
+      (should= :ccp (get-in doc [:proposals 0 :id]))
+      (should= "2026-09-18 10:30:00" (get-in doc [:proposals 0 :name]))
+      (should= 0 (:level ir))))
+
   (it "marks a dependency from a higher-level segment to a lower-level one"
     (let [ranks (policy/level-ranks
                   {:levels [[:domain :source] [:engine] [:application]]})

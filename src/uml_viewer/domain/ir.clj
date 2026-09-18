@@ -75,7 +75,8 @@
              :hide-members (boolean (:hide-members c))
              :fields (mapv as-member (:fields c))
              :ops (mapv as-member (:ops c))}
-      (:ns c) (assoc :ns (str (:ns c))))))
+      (:ns c) (assoc :ns (str (:ns c)))
+      (some? (:level c)) (assoc :level (long (:level c))))))
 
 (defn- as-package [p]
   (let [label (or (:label p) (some-> (:id p) name))]

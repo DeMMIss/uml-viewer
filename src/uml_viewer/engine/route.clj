@@ -7,6 +7,11 @@
 (defn- class-by-id [scene]
   (into {} (map (juxt :id identity) (:classes scene))))
 
+(defn- laid-out?
+  "True when `n` has a rectangle with numeric origin."
+  [n]
+  (and n (number? (:x (:rect n))) (number? (:y (:rect n)))))
+
 (defn- head [kind]
   (case kind
     :inheritance :triangle
@@ -497,9 +502,11 @@
         lr? (lr? scene)
         edges (:edges (:diagram scene))
         annotated
-        (mapv (fn [e]
-                (assoc e :from-n (idx (:from e)) :to-n (idx (:to e))))
-              edges)
+        (->> edges
+             (map (fn [e]
+                    (assoc e :from-n (idx (:from e)) :to-n (idx (:to e)))))
+             (filter #(and (laid-out? (:from-n %)) (laid-out? (:to-n %))))
+             vec)
         from-t (port-t (group-by :from annotated)
                        (fn [e] (if lr?
                                  (geom/cy (:rect (:to-n e)))

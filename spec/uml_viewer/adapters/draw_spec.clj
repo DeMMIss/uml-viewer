@@ -532,7 +532,28 @@
                              :cam-x 0 :cam-y 0})
           (should-contain document/waiting-message (texts log))
           (should-not-contain "Tiny" (texts log))
-          (should-contain "Inspector" (texts log)))))))
+          (should-contain "Inspector" (texts log))))))
+
+  (it "paints the class level number at the upper left"
+    (record-quil
+      (fn [log]
+        (let [c {:id :a :name "A" :level 0
+                 :rect {:x 10 :y 10 :w 80 :h 40}
+                 :lines [{:kind :name :text "A"}]}]
+          (call 'draw-class c false false)
+          (should-contain "0" (texts log))))))
+
+  (it "paints the proposal banner when the diagram is a proposal"
+    (record-quil
+      (fn [log]
+        (let [state {:scene (update (scene) :diagram assoc
+                                    :proposal true
+                                    :title "PROPOSAL — not instantiated in code")
+                     :cam-x 0 :cam-y 0}]
+          (call 'draw-state state)
+          (should-contain "PROPOSAL — not instantiated in code" (texts log))
+          (should-contain "P returns to the namespace tree." (texts log))
+          (should (painted? log :fill draw/gold)))))))
 
 (describe "draw-detail"
   (it "scrolls content and highlights the hovered op"

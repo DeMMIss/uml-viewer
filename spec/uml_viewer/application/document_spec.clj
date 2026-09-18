@@ -35,6 +35,57 @@
       (should (seq (:classes (:scene s))))
       (should (pos? (:mtime s)))))
 
+  (it "compiles named proposal packages at the root and the ns tree otherwise"
+    (let [doc {:hierarchical true
+               :title "Demo"
+               :proposal {:notice "PROPOSAL — not instantiated in code"
+                          :layers [{:id :kernel :label "Kernel" :nses [:domain]}]}
+               :classes [{:id :domain :name "Domain" :ns "demo.domain"}
+                         {:id :engine :name "Engine" :ns "demo.engine"}]
+               :edges []
+               :order [:domain :engine]}
+          proposed (document/compile-view doc "target" [] true)
+          tree (document/compile-view doc "target" [] false)
+          drilled (document/compile-view doc "target" [:domain] true)]
+      (should (get-in proposed [:diagram :proposal]))
+      (should= "PROPOSAL — not instantiated in code"
+               (get-in proposed [:diagram :title]))
+      (should (some #(= "Kernel" (:label %)) (:packages proposed)))
+      (should-not (get-in tree [:diagram :proposal]))
+      (should-not (get-in drilled [:diagram :proposal]))))
+
+  (it "routes every declutter mode on the ns tree and a proposal without throwing"
+    (let [doc {:hierarchical true
+               :title "Demo"
+               :proposal {:layers [{:id :kernel :label "Kernel" :nses [:domain]}
+                                   {:id :shell :label "Shell" :nses [:engine]}]}
+               :classes [{:id :domain :name "Domain" :ns "demo.domain"
+                          :crap {:mu 1 :max 1 :sigma 0} :killed 2 :survived 0}
+                         {:id :engine :name "Engine" :ns "demo.engine"}]
+               :edges [{:from :engine :to :domain :kind :dependency}
+                       {:from :domain :to :missing :kind :dependency}]
+               :order [:domain :engine]
+               :levels [[:domain] [:engine]]}]
+      (doseq [mode [:full :arrows :methods :classes]]
+        (let [tree (document/compile-view doc "target" [] {:declutter mode})
+              prop (document/compile-view doc "target" [] {:declutter mode
+                                                          :proposal true})]
+          (should (map? tree))
+          (should (map? prop))
+          (should (every? #(number? (get-in % [:rect :x])) (:classes tree)))
+          (should (every? #(number? (get-in % [:rect :x])) (:classes prop)))))))
+
+  (it "hides members when declutter is :methods"
+    (let [doc {:hierarchical true
+               :title "Demo"
+               :classes [{:id :domain :name "Domain" :ns "demo.domain"
+                          :ops [{:name "go" :text "go()"}]}]
+               :edges []
+               :order [:domain]}
+          scene (document/compile-view doc "target" [] {:declutter :methods})
+          c (first (filter #(= :domain (:id %)) (:classes scene)))]
+      (should-not (some #(= :op (:kind %)) (:lines c)))))
+
   (it "starts waiting without loading the EDN"
     (let [root (io/file "target" (str "wait-" (System/nanoTime)))]
       (.mkdirs root)

@@ -5,41 +5,144 @@
             [uml-viewer.domain.hierarchy :as hierarchy]
             [uml-viewer.engine.hit :as hit]
             [uml-viewer.engine.layout :as layout]
-            [uml-viewer.application.overlay :as overlay]))
+            [uml-viewer.application.overlay :as overlay]
+            [uml-viewer.domain.policy :as policy]))
 
 (defn- last-seg [id]
   (keyword (last (str/split (name id) #"\."))))
+
+(defn- view-opts [state]
+  {:proposal-id (:proposal-id state)
+   :declutter (or (:declutter state) :full)
+   :open-layer (:open-layer state)})
 
 (defn- rebuild [state]
   (if (and (:doc state) (:hierarchical (:doc state)))
     (assoc state
       :scene (document/compile-view (:doc state)
                                     (overlay/metrics-root (:path state))
-                                    (or (:focus state) []))
+                                    (or (:focus state) [])
+                                    (view-opts state))
       :cam-x 0
       :cam-y 0
       :selected nil)
     state))
 
+(defn show-proposal
+  "Show named proposal `id` at the root. Nil `id` is the namespace tree."
+  [state id]
+  (rebuild (assoc state :proposal-id id :proposal (boolean id) :focus []
+             :open-layer nil)))
+
+(defn toggle-proposal
+  "Switch the root view between the namespace tree and the current proposal."
+  [state]
+  (if (or (nil? (:doc state))
+          (empty? (hierarchy/named-proposals (:doc state))))
+    state
+    (if (:proposal-id state)
+      (show-proposal state nil)
+      (show-proposal state (:id (first (hierarchy/named-proposals (:doc state))))))))
+
+(defn cycle-declutter
+  [state]
+  (rebuild (assoc state :declutter (hierarchy/next-declutter (:declutter state)))))
+
+(defn- persist-doc [state doc]
+  (let [path (:path state)
+        doc (document/write-proposals! path doc)]
+    (rebuild (assoc state
+               :doc doc
+               :mtime (if path (.lastModified (java.io.File. path)) 0)))))
+
+(defn- with-proposals [doc ps]
+  (assoc doc :proposals (vec ps)))
+
+(defn add-proposal
+  "Append an empty proposal named with a timestamp and show it."
+  [state]
+  (if (nil? (:doc state))
+    state
+    (let [p {:id (keyword (str "p-" (System/currentTimeMillis)))
+             :name (policy/timestamp-name)
+             :layers []
+             :notice policy/proposal-notice}
+          doc (with-proposals (:doc state)
+                (conj (vec (hierarchy/named-proposals (:doc state))) p))]
+      (persist-doc (assoc state :proposal-id (:id p) :proposal true :focus [])
+                   doc))))
+
+(defn delete-proposal
+  [state id]
+  (if (or (nil? id) (nil? (:doc state)))
+    state
+    (let [doc (with-proposals (:doc state)
+                (remove #(= id (:id %)) (hierarchy/named-proposals (:doc state))))
+          state (cond-> state
+                  (= id (:proposal-id state))
+                  (assoc :proposal-id nil :proposal false))]
+      (persist-doc state doc))))
+
+(defn rename-proposal
+  [state id new-name]
+  (let [n (and new-name (not (str/blank? (str new-name))) (str new-name))]
+    (if (or (nil? id) (nil? n) (nil? (:doc state)))
+      state
+      (let [doc (with-proposals (:doc state)
+                  (map #(if (= id (:id %)) (assoc % :name n) %)
+                       (hierarchy/named-proposals (:doc state))))]
+        (persist-doc state doc)))))
+
+(defn inspector-hit
+  "Hit in screen space on inspector proposal UI, or nil."
+  [state x y window-w]
+  (let [ps (hierarchy/named-proposals (:doc state))
+        n (count ps)
+        row (some (fn [i]
+                    (when (layout/in-rect? (layout/proposal-row-rect window-w i) x y)
+                      {:kind :proposal :id (:id (nth ps i)) :index i}))
+                  (range n))]
+    (or row
+        (when (layout/in-rect? (layout/new-proposal-rect window-w n) x y)
+          {:kind :new-proposal})
+        (when (layout/in-rect? (layout/declutter-rect window-w n) x y)
+          {:kind :declutter}))))
+
+(defn on-inspector-press
+  "Left click on inspector proposal UI."
+  [state hit]
+  (case (:kind hit)
+    :proposal (show-proposal state (:id hit))
+    :new-proposal (add-proposal state)
+    :declutter (cycle-declutter state)
+    state))
+
 (defn layer-id
-  "Namespace to drill from a hit: the layer box, or a child's parent."
+  "Namespace to drill from a hit: the layer box, a child's parent,
+  or a proposal package when classes are collapsed."
   [sel]
   (cond
     (and (= :class (:kind sel)) (:drill? sel)) (:id sel)
     (= :child (:kind sel)) (:parent sel)
+    (and (= :package (:kind sel))
+         (hierarchy/proposal-package-id? (:id sel)))
+    (:id sel)
     :else nil))
 
 (defn drill
   "Open the namespace node `id` (next level down)."
   [state id]
-  (rebuild (update state :focus (fnil conj []) (last-seg id))))
+  (if (hierarchy/proposal-package-id? id)
+    (rebuild (assoc state :open-layer id :focus []))
+    (rebuild (update state :focus (fnil conj []) (last-seg id)))))
 
 (defn back
   "Return to the parent namespace view."
   [state]
-  (if (seq (:focus state))
-    (rebuild (update state :focus pop))
-    state))
+  (cond
+    (:open-layer state) (rebuild (dissoc state :open-layer))
+    (seq (:focus state)) (rebuild (update state :focus pop))
+    :else state))
 
 (defn- view-classes [doc path]
   (mapcat :classes (:packages (hierarchy/view-at doc path))))
@@ -192,4 +295,5 @@
               (back state)
               (assoc state :selected nil))
        :r (-> state (dissoc :waiting) (assoc :mtime 0))
+       :p (toggle-proposal state)
        state))))

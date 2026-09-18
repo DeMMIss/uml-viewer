@@ -113,6 +113,7 @@
              :name (or (:name leaf) (node-label id))
              :drill? drill?}
       (:ns leaf) (assoc :ns (:ns leaf))
+      (some? (:level leaf)) (assoc :level (:level leaf))
       (:stereotype leaf) (assoc :stereotype (:stereotype leaf))
       crap (assoc :crap crap)
       mut (assoc :killed (:killed mut) :survived (:survived mut))
@@ -229,3 +230,194 @@
                          :classes boxes}]
              :edges (vec edges)}
       (seq foreign) (assoc :foreign foreign))))
+
+(defn proposal-layers
+  "Normalized proposal layer maps on `doc`, or []."
+  [doc]
+  (policy/proposal-layers doc))
+
+(defn named-proposals
+  "Named proposals on `doc`, or []."
+  [doc]
+  (policy/named-proposals doc))
+
+(def declutter-modes
+  [:full :arrows :methods :classes])
+
+(defn next-declutter
+  [mode]
+  (let [i (.indexOf declutter-modes (or mode :full))]
+    (nth declutter-modes (mod (inc (max i 0)) (count declutter-modes)))))
+
+(defn- owner-pkg [view id]
+  (some (fn [p]
+          (when (some #(= id (:id %)) (:classes p))
+            (:id p)))
+        (:packages view)))
+
+(defn- merge-direction-edges [edges]
+  (->> edges
+       (group-by (juxt :from :to))
+       vals
+       (mapv (fn [es]
+               (let [viol (boolean (some :violating es))
+                     best (if viol
+                            (or (first (filter :violating es))
+                                (first es))
+                            (apply max-key #(policy/kind-rank (:kind %)) es))
+                     via (into #{} (mapcat (fn [e]
+                                             [(:from e) (:to e)
+                                              (:orig-from e) (:orig-to e)])
+                                           es))]
+                 (cond-> (assoc (dissoc best :violating :orig-from :orig-to)
+                           :via-ids (disj via nil))
+                   viol (assoc :kind :dependency :violating true)))))))
+
+(defn- pkg-dummy [p]
+  {:id (:id p)
+   :name (or (:label p) (name (:id p)))
+   :dummy? true
+   :drill? true
+   :hide-members true})
+
+(defn- with-metrics [dummy classes]
+  (let [crap (reduce config/worse-crap nil
+                     (map (fn [c] (or (:crap c) {})) classes))
+        mut (reduce config/worse-mutants nil
+                    (map #(select-keys % [:killed :survived]) classes))
+        lv (when (seq (keep :level classes))
+             (apply min (keep :level classes)))]
+    (cond-> dummy
+      (:mu crap) (assoc :crap crap)
+      (or (:killed mut) (:survived mut))
+      (assoc :killed (:killed mut) :survived (:survived mut))
+      (some? lv) (assoc :level lv))))
+
+(defn- ensure-pkg-dummies [view]
+  (update view :packages
+          (fn [pkgs]
+            (mapv (fn [p]
+                    (if (some #(= (:id p) (:id %)) (:classes p))
+                      p
+                      (update p :classes
+                              #(into [(with-metrics (pkg-dummy p) %)] %))))
+                  pkgs))))
+
+(defn collapse-arrows
+  "One edge per direction between layers. Several packages collapse to
+  package ids; a single wrapping package collapses by box id."
+  [view]
+  (let [pkgs (:packages view)
+        multi? (> (count pkgs) 1)
+        view (if multi? (ensure-pkg-dummies view) view)
+        remap (fn [id] (if multi? (or (owner-pkg view id) id) id))
+        known (set (concat (map :id (mapcat :classes (:packages view)))
+                           (map :id (:foreign view))))
+        edges (->> (:edges view)
+                   (map (fn [e]
+                          (assoc e
+                            :orig-from (:from e)
+                            :orig-to (:to e)
+                            :from (remap (:from e))
+                            :to (remap (:to e)))))
+                   (filter #(and (known (:from %)) (known (:to %))))
+                   (remove #(= (:from %) (:to %)))
+                   vec)]
+    (assoc view :edges (merge-direction-edges edges))))
+
+(defn hide-methods
+  "Drop fields and ops from class boxes."
+  [view]
+  (update view :packages
+          (fn [pkgs]
+            (mapv (fn [p]
+                    (update p :classes
+                            (fn [cs]
+                              (mapv #(assoc % :hide-members true) cs))))
+                  pkgs))))
+
+(defn hide-classes
+  "Keep layer boxes; drop contained class boxes (dummy endpoints remain).
+  A single wrapping package keeps its layer boxes but empties their contents."
+  [view]
+  (if (> (count (:packages view)) 1)
+    (update view :packages
+            (fn [pkgs]
+              (mapv (fn [p]
+                      (let [real (vec (remove :dummy? (:classes p)))
+                            dummy (with-metrics
+                                    (or (first (filter :dummy? (:classes p)))
+                                        (pkg-dummy p))
+                                    real)]
+                        (assoc p :classes [dummy]
+                          :nses (mapv :id real))))
+                    pkgs)))
+    (update view :packages
+            (fn [pkgs]
+              (mapv (fn [p]
+                      (update p :classes
+                              (fn [cs]
+                                (mapv #(assoc (dissoc % :contents)
+                                         :hide-members true)
+                                      (remove :dummy? cs)))))
+                    pkgs)))))
+
+(defn apply-declutter
+  [view mode]
+  (let [mode (or mode :full)]
+    (cond-> view
+      (#{:arrows :methods :classes} mode) collapse-arrows
+      (#{:methods :classes} mode) hide-methods
+      (= :classes mode) hide-classes)))
+
+(defn proposal-view
+  "Root view with named proposal packages around the real top-level nses.
+  Package ids are `proposal.*` so they never collide with a class id.
+  `which` is a proposal id, a proposal map, or nil (first proposal)."
+  ([doc] (proposal-view doc nil))
+  ([doc which]
+   (let [root (view-at doc [])
+         boxes (mapcat :classes (:packages root))
+         by-id (into {} (map (juxt :id identity) boxes))
+         named (or (when (and (map? which) (:layers which)) which)
+                   (when which (policy/proposal-by-id doc which))
+                   (first (policy/named-proposals doc)))
+         proposal (or (policy/normalize-proposal named)
+                      (policy/normalize-proposal (:proposal doc)))
+         layers (or (:layers proposal) [])
+         claimed (set (mapcat :nses layers))
+         extras (filterv #(not (claimed (:id %))) boxes)
+         mk (fn [layer]
+              (let [cs (into [] (keep by-id (:nses layer)))]
+                (when (seq cs)
+                  {:id (keyword (str "proposal." (name (:id layer))))
+                   :label (:label layer)
+                   :classes cs})))
+         pkgs (cond-> (vec (keep mk layers))
+                (seq extras)
+                (conj {:id :proposal.unassigned
+                       :label "Unassigned"
+                       :classes extras}))
+         pkgs (vec (rseq pkgs))
+         notice (or (:notice named) (:notice proposal) policy/proposal-notice)]
+     (if (seq pkgs)
+       (assoc root
+         :title notice
+         :proposal true
+         :packages pkgs)
+       root))))
+
+(defn layer-view
+  "One proposal package as the diagram, with its classes visible."
+  [doc which pkg-id]
+  (let [root (proposal-view doc which)
+        pkg (first (filter #(= pkg-id (:id %)) (:packages root)))]
+    (if pkg
+      (assoc root
+        :title (or (:label pkg) (name pkg-id))
+        :packages [pkg])
+      root)))
+
+(defn proposal-package-id?
+  [id]
+  (and id (str/starts-with? (name id) "proposal.")))

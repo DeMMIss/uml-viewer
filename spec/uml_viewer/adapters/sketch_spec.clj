@@ -591,6 +591,7 @@
       (should (some #{sketch/launch-prompt} args))
       (should (re-find #"On launch" sketch/standing-rules))
       (should (re-find #"invent" sketch/standing-rules))
+      (should (re-find #":proposals" sketch/standing-rules))
       (should (re-find #"to-agent.edn" sketch/standing-rules))
       (should (re-find #":quit-for-restart" sketch/standing-rules))
       (should (re-find #"uml-viewer-restart" sketch/standing-rules))

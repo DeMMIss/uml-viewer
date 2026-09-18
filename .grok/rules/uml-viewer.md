@@ -6,6 +6,10 @@ The diagram is already on screen.
   `examples/uml-viewer.policy.edn` via `clj -M:ir`.
 - Policy follows **namespace nesting**, not invented layers. Dots after
   the prefix are the tree. Do not add Domain/Engine-style packages.
+- `:proposals` are named groupings that are **not** in the source. Preserve
+  them when rewriting policy. Do not invent them on launch. The inspector
+  lists them; **P** returns to the namespace tree. If instructed, add a
+  named proposal (default name is a timestamp) and regenerate the IR.
 - After source or policy change: `clj -M:crap`, `clj -M:mutate` on changed
   `src/` files (differential), then `clj -M:ir`. Uncovered mutants are
   coverage gaps: keep the snapshot; do not re-run the file or force a

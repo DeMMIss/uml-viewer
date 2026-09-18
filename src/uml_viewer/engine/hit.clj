@@ -27,7 +27,9 @@
                         {:kind :class
                          :id (:id c)
                          :drill? (boolean (:drill? c))})))))
-            (reverse (remove :dummy? (:classes scene))))
+            (let [cs (:classes scene)
+                  visible (vec (remove :dummy? cs))]
+              (reverse (if (seq visible) visible cs))))
       (some (fn [p]
               (when (geom/inside? (:rect p) x y)
                 {:kind :package :id (:id p)}))

@@ -152,6 +152,9 @@
                         (some-> (:package c) name)))
           acc {:rows [] :y pad}
           acc (emit acc :name (:name c) {})
+          acc (if (some? (:level c))
+                (emit acc :muted (str "Level " (:level c)) {})
+                acc)
           acc (if-let [st (:stereotype c)]
                 (emit acc :muted (str "«" (name st) "»") {})
                 acc)

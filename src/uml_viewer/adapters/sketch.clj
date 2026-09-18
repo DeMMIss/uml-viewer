@@ -11,9 +11,11 @@
             [uml-viewer.engine.layout :as layout]
             [uml-viewer.domain.mailbox :as mailbox]
             [uml-viewer.application.overlay :as overlay]
-            [uml-viewer.adapters.source-window :as source-window])
+            [uml-viewer.adapters.source-window :as source-window]
+            [uml-viewer.domain.policy :as policy])
   (:import [java.awt Frame]
-           [javax.swing SwingUtilities]
+           [java.awt.event ActionListener]
+           [javax.swing JMenuItem JOptionPane JPopupMenu SwingUtilities]
            [processing.event MouseEvent]))
 
 (def window-width 1500)
@@ -34,6 +36,10 @@
        "After every later source or policy change:\n"
        "1. Keep the policy as namespace nesting only. Do not re-home a ns to\n"
        "   fake a layer. If the tree is wrong, change the requires or the ns.\n"
+       "   Preserve :proposals (named layers that are not namespaces). Do not\n"
+       "   invent :proposals on launch. The inspector lists them; P returns to\n"
+       "   the namespace tree. If instructed, add a named proposal to :proposals\n"
+       "   in the policy (default name is a timestamp) and regenerate the IR.\n"
        "2. Run clj -M:crap.\n"
        "3. Run clj -M:mutate on each changed file under src/ (differential).\n"
        "   Uncovered mutants are coverage gaps: keep the snapshot; do not\n"
@@ -437,12 +443,22 @@
      :window-h h
      :view-w (max 0 (- w layout/sidebar-w))}))
 
+(defn- apply-proposal-op [state op]
+  (case (:op op)
+    :rename (events/rename-proposal state (:id op) (:name op))
+    :delete (events/delete-proposal state (:id op))
+    state))
+
 (defn- apply-bridge-flags [state]
   (let [state (if (take-flag! :closed?)
                 (events/close-detail state)
                 state)
         state (if-let [id (take-flag! :pick)]
                 (events/select-class state id)
+                state)
+        state (if-let [op (:proposal-op @!bridge)]
+                (do (swap! !bridge dissoc :proposal-op)
+                    (apply-proposal-op state op))
                 state)]
     (if-let [id (:detail-id state)]
       (when-let [model (detail/model (events/card-scene state) id)]
@@ -469,35 +485,82 @@
     [(q/width) (q/height)]
     (catch Throwable _ [window-width window-height])))
 
+(defn- right-click? [event]
+  (or (= :right (:button event))
+      (and (instance? MouseEvent event)
+           (or (.isPopupTrigger ^MouseEvent event)
+               (= 3 (.getButton ^MouseEvent event))))))
+
+(defn- popup-proposal-menu! [x y id pname]
+  (later!
+    (fn []
+      (let [menu (JPopupMenu.)
+            rename (JMenuItem. "Rename")
+            delete (JMenuItem. "Delete")
+            canvas (some-> (applet/current-applet) native-window)]
+        (.addActionListener rename
+          (reify ActionListener
+            (actionPerformed [_ _]
+              (let [n (JOptionPane/showInputDialog nil "Rename proposal" (str pname))]
+                (when (and n (seq (str/trim n)))
+                  (swap! !bridge assoc :proposal-op
+                         {:op :rename :id id :name (str/trim n)}))))))
+        (.addActionListener delete
+          (reify ActionListener
+            (actionPerformed [_ _]
+              (swap! !bridge assoc :proposal-op {:op :delete :id id}))))
+        (.add menu rename)
+        (.add menu delete)
+        (if canvas
+          (.show menu canvas (int x) (int y))
+          (.show menu nil (int x) (int y)))))))
+
 (defn- on-main-press [state event]
-  (let [[w h] (applet-size)]
-    (if (events/regen-hit? (:x event) (:y event) w h)
-    (let [root (overlay/metrics-root (:path state))
-          {:keys [woke?]} (request-regen! root)]
-      (assoc state :mail-status (if woke?
-                                  "Regen requested."
-                                  "Regen queued; Grok session not attached.")))
-    (let [state (events/on-press state (:x event) (:y event))
-        sel (:selected state)
-        n (click-count event)]
+  (let [[w h] (applet-size)
+        x (:x event)
+        y (:y event)
+        in-sidebar? (>= x (- w layout/sidebar-w))]
     (cond
-      (and (>= n 2) (events/layer-id sel))
-      (events/drill state (events/layer-id sel))
+      (events/regen-hit? x y w h)
+      (let [root (overlay/metrics-root (:path state))
+            {:keys [woke?]} (request-regen! root)]
+        (assoc state :mail-status (if woke?
+                                    "Regen requested."
+                                    "Regen queued; Grok session not attached.")))
 
-      (and (>= n 2) (= :class (:kind sel)))
-      (open-card! state (:id sel))
-
-      (= :port (:kind sel))
-      (open-card! state (:id sel))
-
-      (= :child (:kind sel))
-      (open-card! state (:id sel))
-
-      (= :class (:kind sel))
-      state
+      in-sidebar?
+      (let [hit (events/inspector-hit state x y w)]
+        (cond
+          (and (right-click? event) (= :proposal (:kind hit)))
+          (do (popup-proposal-menu!
+                x y (:id hit)
+                (:name (policy/proposal-by-id (:doc state) (:id hit))))
+              state)
+          hit (events/on-inspector-press state hit)
+          :else state))
 
       :else
-      (do (pin-card! false) state))))))
+      (let [state (events/on-press state x y)
+            sel (:selected state)
+            n (click-count event)]
+        (cond
+          (and (>= n 2) (events/layer-id sel))
+          (events/drill state (events/layer-id sel))
+
+          (and (>= n 2) (= :class (:kind sel)))
+          (open-card! state (:id sel))
+
+          (= :port (:kind sel))
+          (open-card! state (:id sel))
+
+          (= :child (:kind sel))
+          (open-card! state (:id sel))
+
+          (= :class (:kind sel))
+          state
+
+          :else
+          (do (pin-card! false) state))))))
 
 (defn- applet-shift? []
   (try

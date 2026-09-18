@@ -4,7 +4,8 @@
             [uml-viewer.application.detail :as detail]
             [uml-viewer.application.events :as events]
             [uml-viewer.domain.geom :as geom]
-            [uml-viewer.domain.ir :as ir]))
+            [uml-viewer.domain.ir :as ir]
+            [uml-viewer.engine.layout :as layout]))
 
 (defn scene []
   (compose/compile-diagram
@@ -71,6 +72,90 @@
           next (events/on-scroll s 100 {:horizontal? true :window-w 1500
                                        :window-h 800 :view-w view-w})]
       (should= (double (- 1400 view-w)) (:cam-x next))))
+
+  (it "toggles the proposal root view on p and ignores p when none is defined"
+    (let [doc {:hierarchical true
+               :title "Demo"
+               :proposal {:notice "PROPOSAL — not instantiated in code"
+                          :layers [{:id :kernel :label "Kernel" :nses [:domain]}]}
+               :classes [{:id :domain :name "Domain" :ns "demo.domain"}
+                         {:id :engine :name "Engine" :ns "demo.engine"}]
+               :edges []
+               :order [:domain :engine]}
+          s {:doc doc :path "examples/library.edn" :focus [] :proposal false
+             :scene {:classes []} :cam-x 0 :cam-y 0 :selected nil}
+          on (events/on-key s :p)
+          off (events/on-key on :p)
+          plain (events/on-key (dissoc s :doc) :p)]
+      (should (:proposal on))
+      (should (:proposal-id on))
+      (should= [] (:focus on))
+      (should (get-in on [:scene :diagram :proposal]))
+      (should-not (:proposal off))
+      (should-not (:proposal-id off))
+      (should-not (get-in off [:scene :diagram :proposal]))
+      (should= plain (events/on-key plain :p))))
+
+  (it "hits proposal rows, New, and Declutter in the inspector"
+    (let [doc {:proposals [{:id :a :name "A" :layers []}
+                           {:id :b :name "B" :layers []}]}
+          s {:doc doc}
+          w 1500
+          r0 (layout/proposal-row-rect w 0)
+          nr (layout/new-proposal-rect w 2)
+          dr (layout/declutter-rect w 2)]
+      (should= :a (:id (events/inspector-hit s (+ (:x r0) 2) (+ (:y r0) 2) w)))
+      (should= :new-proposal (:kind (events/inspector-hit s (geom/cx nr) (geom/cy nr) w)))
+      (should= :declutter (:kind (events/inspector-hit s (geom/cx dr) (geom/cy dr) w)))
+      (should-be-nil (events/inspector-hit s 10 10 w))))
+
+  (it "adds, renames, and deletes a proposal without touching the IR path"
+    (let [doc {:hierarchical true :title "T" :classes [] :edges [] :order []
+               :proposals [{:id :old :name "Old" :layers []}]}
+          s {:doc doc :path nil}
+          added (events/add-proposal s)
+          id (:proposal-id added)
+          renamed (events/rename-proposal added id "Named")
+          gone (events/delete-proposal renamed id)]
+      (should id)
+      (should (some #(= "Named" (:name %)) (get-in renamed [:doc :proposals])))
+      (should-not (some #(= id (:id %)) (get-in gone [:doc :proposals])))
+      (should-be-nil (:proposal-id gone))))
+
+  (it "drills a collapsed proposal package and backs out"
+    (let [doc {:hierarchical true
+               :title "Demo"
+               :proposals [{:id :ccp :name "CCP"
+                            :layers [{:id :kernel :label "Kernel" :nses [:domain]}]}]
+               :classes [{:id :domain :name "Domain" :ns "demo.domain"}]
+               :edges []
+               :order [:domain]}
+          s {:doc doc :path nil :focus [] :proposal-id :ccp
+             :scene {:classes []} :cam-x 0 :cam-y 0 :selected nil}
+          opened (events/drill s :proposal.kernel)
+          back (events/back opened)]
+      (should= :proposal.kernel (:open-layer opened))
+      (should-be-nil (:open-layer back))))
+
+  (it "cycles declutter Full → arrows → methods → classes → Full"
+    (let [s {:declutter :full}]
+      (should= :arrows (:declutter (events/cycle-declutter s)))
+      (should= :methods (:declutter (events/cycle-declutter {:declutter :arrows})))
+      (should= :classes (:declutter (events/cycle-declutter {:declutter :methods})))
+      (should= :full (:declutter (events/cycle-declutter {:declutter :classes})))))
+
+  (it "declutters a full hierarchical diagram even when an edge end is missing"
+    (let [doc {:hierarchical true
+               :classes [{:id :a :name "A"} {:id :b :name "B"}]
+               :edges [{:from :a :to :b :kind :dependency}
+                       {:from :a :to :ghost :kind :dependency}]
+               :order [:a :b]}
+          s (assoc (state) :doc doc :declutter :full)
+          next (events/cycle-declutter s)]
+      (should= :arrows (:declutter next))
+      (should (seq (get-in next [:scene :classes])))
+      (should (every? #(number? (get-in % [:rect :x]))
+                      (get-in next [:scene :classes])))))
 
   (it "reloads on r by clearing mtime"
     (should= 0 (:mtime (events/on-key (assoc (state) :mtime 99) :r))))
