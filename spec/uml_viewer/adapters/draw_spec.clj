@@ -204,7 +204,20 @@
         (should (painted? log :stroke (draw/stroke-for (draw/grade-of (a-package)))))
         (should-contain [:stroke-weight 1.4] @log)
         (should-contain "C" (texts log))
-        (should-contain "M" (texts log))))))
+        (should-contain "M" (texts log)))))
+
+  (it "paints package titles after arrows"
+    (record-quil
+      (fn [log]
+        (call 'draw-state {:scene (scene) :cam-x 0 :cam-y 0})
+        (let [ops @log
+              idx (fn [pred]
+                    (first (keep-indexed (fn [i e] (when (pred e) i)) ops)))
+              edge-i (idx #(#{:line :bezier :quad :triangle} (first %)))
+              title-i (idx #(and (= :text (first %)) (= "P" (second %))))]
+          (should (number? edge-i))
+          (should (number? title-i))
+          (should (< edge-i title-i)))))))
 
 (describe "class-line-ink"
   (it "maps line kinds onto theme inks"

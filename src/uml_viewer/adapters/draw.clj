@@ -195,13 +195,16 @@
     (draw-metric-dot (:c dots) "C" (crap-grade-of m))
     (draw-metric-dot (:m dots) "M" (mutation-grade-of m))))
 
-(defn- draw-package [p selected?]
+(defn- draw-package-body [p selected?]
   (let [r (:rect p)
         g (grade-of p)]
     (rgb (fill-for g) 80)
     (stroke-rgb (if selected? gold (stroke-for g))
                 (if selected? 2.5 1.4))
-    (q/rect (:x r) (:y r) (:w r) (:h r) 8)
+    (q/rect (:x r) (:y r) (:w r) (:h r) 8)))
+
+(defn- draw-package-title [p]
+  (let [r (:rect p)]
     (rgb gold)
     (q/text-align :left :center)
     (q/text-size 14)
@@ -209,6 +212,10 @@
     (q/text (:title p) (+ (:x r) layout/pad) (+ (:y r) (/ layout/banner-h 2)))
     (name-font! false)
     (draw-metric-dots p r)))
+
+(defn- draw-package [p selected?]
+  (draw-package-body p selected?)
+  (draw-package-title p))
 
 (defn- class-line-ink [kind]
   (case kind
@@ -566,15 +573,10 @@
                    :else nil)]
     (q/scale z)
     (q/translate (- cam-x) (- cam-y))
-    (doseq [sec (:sections scene)]
-      (rgb gold)
-      (q/text-align :left :top)
-      (q/text-size 20)
-      (q/text (or (:title sec) "") layout/pad (:title-y sec)))
     (doseq [p (:packages scene)
             :when (in-view? (:rect p) cam-x cam-y world-w world-h)]
-      (draw-package p (and (= :package (get-in state [:selected :kind]))
-                           (= (:id p) (get-in state [:selected :id])))))
+      (draw-package-body p (and (= :package (get-in state [:selected :kind]))
+                                (= (:id p) (get-in state [:selected :id])))))
     (doseq [e (:edges scene)
             :when (let [b (:draw-bounds e)]
                     (or (nil? b) (in-view? b cam-x cam-y world-w world-h)))]
@@ -585,6 +587,14 @@
                           (= (:from e) (:from hover))
                           (= (:to e) (:to hover))))
                  scene))
+    (doseq [sec (:sections scene)]
+      (rgb gold)
+      (q/text-align :left :top)
+      (q/text-size 20)
+      (q/text (or (:title sec) "") layout/pad (:title-y sec)))
+    (doseq [p (:packages scene)
+            :when (in-view? (:rect p) cam-x cam-y world-w world-h)]
+      (draw-package-title p))
     (doseq [c (remove :dummy? (:classes scene))
             :when (or (in-view? (:rect c) cam-x cam-y world-w world-h)
                       (some #(in-view? (:rect %) cam-x cam-y world-w world-h)
