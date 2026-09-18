@@ -13,7 +13,7 @@
             [uml-viewer.application.overlay :as overlay]
             [uml-viewer.adapters.source-window :as source-window]
             [uml-viewer.domain.policy :as policy])
-  (:import [java.awt Frame]
+  (:import [java.awt Component Container Frame]
            [java.awt.event ActionListener]
            [javax.swing JMenuItem JOptionPane JPopupMenu SwingUtilities]
            [processing.event MouseEvent]))
@@ -35,11 +35,13 @@
        "diagram matches. Do not edit the generated EDN by hand.\n"
        "After every later source or policy change:\n"
        "1. Keep the policy as namespace nesting only. Do not re-home a ns to\n"
-       "   fake a layer. If the tree is wrong, change the requires or the ns.\n"
-       "   Preserve :proposals (named layers that are not namespaces). Do not\n"
-       "   invent :proposals on launch. The inspector lists them; P returns to\n"
-       "   the namespace tree. If instructed, add a named proposal to :proposals\n"
-       "   in the policy (default name is a timestamp) and regenerate the IR.\n"
+       "   fake a layer/component. Layer and component mean the same thing.\n"
+       "   If the tree is wrong, change the requires or the ns.\n"
+       "   Preserve :proposals (named components that are not namespaces). Do not\n"
+       "   invent :proposals on launch. The inspector lists them; click the real\n"
+       "   diagram above Proposals to return to the namespace tree. If instructed,\n"
+       "   add a named proposal to :proposals in the policy (default name is a\n"
+       "   timestamp) and regenerate the IR.\n"
        "2. Run clj -M:crap.\n"
        "3. Run clj -M:mutate on each changed file under src/ (differential).\n"
        "   Uncovered mutants are coverage gaps: keep the snapshot; do not\n"
@@ -63,7 +65,7 @@
 
 (def launch-prompt
   (str "On launch: from this working directory, update the hierarchical policy "
-       "to match the project's namespaces (no invented layers), regenerate the "
+       "to match the project's namespaces (no invented layers/components), regenerate the "
        "IR, then wait for directives."))
 
 (defn grok-executable
@@ -491,29 +493,64 @@
            (or (.isPopupTrigger ^MouseEvent event)
                (= 3 (.getButton ^MouseEvent event))))))
 
-(defn- popup-proposal-menu! [x y id pname]
-  (later!
-    (fn []
-      (let [menu (JPopupMenu.)
-            rename (JMenuItem. "Rename")
-            delete (JMenuItem. "Delete")
-            canvas (some-> (applet/current-applet) native-window)]
-        (.addActionListener rename
-          (reify ActionListener
-            (actionPerformed [_ _]
-              (let [n (JOptionPane/showInputDialog nil "Rename proposal" (str pname))]
-                (when (and n (seq (str/trim n)))
-                  (swap! !bridge assoc :proposal-op
-                         {:op :rename :id id :name (str/trim n)}))))))
-        (.addActionListener delete
-          (reify ActionListener
-            (actionPerformed [_ _]
-              (swap! !bridge assoc :proposal-op {:op :delete :id id}))))
-        (.add menu rename)
-        (.add menu delete)
-        (if canvas
-          (.show menu canvas (int x) (int y))
-          (.show menu nil (int x) (int y)))))))
+(defn- processing-mouse [event]
+  (cond
+    (instance? MouseEvent event) event
+    :else (try
+            (some-> (applet/current-applet) (.-mouseEvent))
+            (catch Exception _ nil))))
+
+(defn- awt-mouse [event]
+  (when-let [pe (processing-mouse event)]
+    (try
+      (let [n (.getNative ^MouseEvent pe)]
+        (when (instance? java.awt.event.MouseEvent n) n))
+      (catch Exception _ nil))))
+
+(defn- popup-anchor
+  "Invoker and local x,y for JPopupMenu.show at the mouse-down."
+  [event x y]
+  (let [awt (awt-mouse event)
+        native (try (some-> (applet/current-applet) native-window)
+                    (catch Exception _ nil))
+        invoker (or (when awt (.getComponent ^java.awt.event.MouseEvent awt))
+                    (when (instance? Component native) native))]
+    (cond
+      awt
+      {:invoker invoker
+       :x (.getX ^java.awt.event.MouseEvent awt)
+       :y (.getY ^java.awt.event.MouseEvent awt)}
+
+      (instance? Container invoker)
+      (let [in (.getInsets ^Container invoker)]
+        {:invoker invoker
+         :x (+ (int x) (.left in))
+         :y (+ (int y) (.top in))})
+
+      :else
+      {:invoker invoker :x (int x) :y (int y)})))
+
+(defn- popup-proposal-menu! [event x y id pname]
+  (let [anchor (popup-anchor event x y)]
+    (later!
+      (fn []
+        (let [menu (JPopupMenu.)
+              rename (JMenuItem. "Rename")
+              delete (JMenuItem. "Delete")]
+          (.addActionListener rename
+            (reify ActionListener
+              (actionPerformed [_ _]
+                (let [n (JOptionPane/showInputDialog nil "Rename proposal" (str pname))]
+                  (when (and n (seq (str/trim n)))
+                    (swap! !bridge assoc :proposal-op
+                           {:op :rename :id id :name (str/trim n)}))))))
+          (.addActionListener delete
+            (reify ActionListener
+              (actionPerformed [_ _]
+                (swap! !bridge assoc :proposal-op {:op :delete :id id}))))
+          (.add menu rename)
+          (.add menu delete)
+          (.show menu (:invoker anchor) (int (:x anchor)) (int (:y anchor))))))))
 
 (defn- on-main-press [state event]
   (let [[w h] (applet-size)
@@ -533,7 +570,7 @@
         (cond
           (and (right-click? event) (= :proposal (:kind hit)))
           (do (popup-proposal-menu!
-                x y (:id hit)
+                event x y (:id hit)
                 (:name (policy/proposal-by-id (:doc state) (:id hit))))
               state)
           hit (events/on-inspector-press state hit)

@@ -66,7 +66,7 @@
                        {:from :domain :to :missing :kind :dependency}]
                :order [:domain :engine]
                :levels [[:domain] [:engine]]}]
-      (doseq [mode [:full :arrows :methods :classes]]
+      (doseq [mode [:full :arrows :elements :classes]]
         (let [tree (document/compile-view doc "target" [] {:declutter mode})
               prop (document/compile-view doc "target" [] {:declutter mode
                                                           :proposal true})]
@@ -75,16 +75,19 @@
           (should (every? #(number? (get-in % [:rect :x])) (:classes tree)))
           (should (every? #(number? (get-in % [:rect :x])) (:classes prop)))))))
 
-  (it "hides members when declutter is :methods"
+  (it "hides nested names, members, and ports when declutter is :elements"
     (let [doc {:hierarchical true
                :title "Demo"
                :classes [{:id :domain :name "Domain" :ns "demo.domain"
                           :ops [{:name "go" :text "go()"}]}]
                :edges []
                :order [:domain]}
-          scene (document/compile-view doc "target" [] {:declutter :methods})
+          scene (document/compile-view doc "target" [] {:declutter :elements})
           c (first (filter #(= :domain (:id %)) (:classes scene)))]
-      (should-not (some #(= :op (:kind %)) (:lines c)))))
+      (should-not (some #(= :op (:kind %)) (:lines c)))
+      (should-not (some #(= :child (:kind %)) (:lines c)))
+      (should-not (seq (:in-ports c)))
+      (should-not (seq (:out-ports c)))))
 
   (it "starts waiting without loading the EDN"
     (let [root (io/file "target" (str "wait-" (System/nanoTime)))]

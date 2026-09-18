@@ -53,6 +53,16 @@
       (should= :a (:parent hit))
       (should= :out (:dir hit))))
 
+  (it "hits an arrow and lists its leaf deps"
+    (let [e {:from :a :to :b :points [[0 0] [100 0] [200 0]]
+             :deps [{:from :a :to :b :violating false}]}
+          s {:classes [] :packages [] :edges [e]}
+          h (hit/at s 100 2)]
+      (should= :edge (:kind h))
+      (should= :a (:from h))
+      (should= :b (:to h))
+      (should= [{:from :a :to :b :violating false}] (:deps h))))
+
   (it "lists edges touching a class"
     (let [s (scene)
           es (hit/connected-edges s :a)]

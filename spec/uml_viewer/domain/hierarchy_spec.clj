@@ -66,14 +66,19 @@
                            edges))]
       (should e)
       (should (contains? (:via-ids e) :ir))
-      (should (contains? (:via-ids e) :source)))))
+      (should (contains? (:via-ids e) :source))
+      (should (some #(and (= :ir (:from %)) (= :layout (:to %))) (:deps e)))
+      (should (some #(and (= :source (:from %)) (= :layout (:to %))) (:deps e))))))
 
-  (it "hides methods then classes as declutter progresses"
+  (it "hides nested names, members, and ports then classes as declutter progresses"
     (let [doc (policy/apply-policy policy graph)
-          methods (hierarchy/apply-declutter (hierarchy/view-at doc []) :methods)
+          elements (hierarchy/apply-declutter (hierarchy/view-at doc []) :elements)
           classes (hierarchy/apply-declutter (hierarchy/view-at doc []) :classes)
           box (fn [v] (first (:classes (first (:packages v)))))]
-      (should (:hide-members (box methods)))
+      (should (:hide-members (box elements)))
+      (should-not (seq (:contents (box elements))))
+      (should-be-nil (:in-deps (box elements)))
+      (should-be-nil (:out-deps (box elements)))
       (should (:hide-members (box classes)))
       (should-not (seq (:contents (box classes))))))
 
@@ -93,6 +98,32 @@
       (should (:dummy? dummy))
       (should (:crap dummy))
       (should= 2 (:killed dummy))))
+
+  (it "re-evaluates violating arrows from the proposal's layer order"
+    (let [p (assoc policy
+              :levels [[:ir] [:layout]]
+              :proposals [{:id :rev :name "reversed"
+                           :layers [{:id :engine :label "Engine" :nses [:layout]}
+                                    {:id :kernel :label "Kernel" :nses [:ir]}]}]
+              :order [:source :layout :ir])
+          g (update graph :edges conj
+                    {:from :ir :to :layout :kind :dependency}
+                    {:from :layout :to :ir :kind :dependency})
+          doc (policy/apply-policy p g)
+          as-is (hierarchy/view-at doc [])
+          view (hierarchy/proposal-view doc :rev)
+          box (fn [v id]
+                (first (filter #(= id (:id %))
+                               (mapcat :classes (:packages v)))))
+          edge (fn [v from to]
+                 (first (filter #(and (= from (:from %)) (= to (:to %)))
+                                (:edges v))))]
+      (should (:violating (edge as-is :ir :layout)))
+      (should-not (:violating (edge as-is :layout :ir)))
+      (should-not (:violating (edge view :ir :layout)))
+      (should (:violating (edge view :layout :ir)))
+      (should= 1 (:level (box view :ir)))
+      (should= 0 (:level (box view :layout)))))
 
 (describe "hierarchy"
   (it "collapses a violating leaf dependency onto the parent segments"

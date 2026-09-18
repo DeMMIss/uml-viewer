@@ -163,6 +163,21 @@
       (should (:violating (first (policy/mark-violations [bad] ranks))))
       (should-be-nil (:violating (first (policy/mark-violations [ok] ranks))))))
 
+  (it "restamps class levels and violating flags from proposal layers"
+    (let [layers [{:id :engine :nses [:layout]}
+                  {:id :kernel :nses [:ir]}]
+          ranks (policy/ranks-from-layers layers)
+          classes [{:id :ir :name "Ir" :level 0}
+                   {:id :layout :name "Layout" :level 1}]
+          edges [{:from :ir :to :layout :kind :dependency :violating true}
+                 {:from :layout :to :ir :kind :dependency}]
+          stamped (policy/restamp-ranks classes edges ranks)]
+      (should= {:layout 0 :ir 1} ranks)
+      (should= 1 (:level (first (filter #(= :ir (:id %)) (:classes stamped)))))
+      (should= 0 (:level (first (filter #(= :layout (:id %)) (:classes stamped)))))
+      (should-be-nil (:violating (first (filter #(= :ir (:from %)) (:edges stamped)))))
+      (should (:violating (first (filter #(= :layout (:from %)) (:edges stamped)))))))
+
   (it "keeps violating on a collapsed dependency and drops it for association"
     (let [es [{:from :a :to :b :kind :dependency :violating true}
               {:from :a :to :b :kind :dependency}]

@@ -161,7 +161,7 @@
     (q/text-font f)))
 
 (defn italic-name?
-  "True for layer/group boxes and non-class classifiers (interface, enum, …)."
+  "True for component/layer boxes and non-class classifiers (interface, enum, …)."
   [c]
   (boolean
     (or (seq (:contents c))
@@ -346,10 +346,44 @@
          (draw-corner-mark r ch))))))
 
 (def ^:private declutter-label
-  {:full "Full"
-   :arrows "Collapse arrows"
-   :methods "Collapse methods"
-   :classes "Collapse classes"})
+  {:full "Declutter none"
+   :arrows "Declutter arrows"
+   :elements "Declutter elements"
+   :classes "Declutter classes"})
+
+(defn- dep-label [d]
+  (str (name (:from d)) " -> " (name (:to d))))
+
+(defn- draw-edge-popup [hover pointer]
+  (when (and (= :edge (:kind hover)) (seq (:deps hover)) (seq pointer))
+    (let [deps (vec (sort-by (juxt (complement :violating)
+                                   #(name (:from %))
+                                   #(name (:to %)))
+                             (:deps hover)))
+          labels (mapv dep-label deps)
+          line-h 16
+          pad 8
+          tw (apply max 40 (map layout/text-w labels))
+          box-w (+ (* 2 pad) tw)
+          box-h (+ (* 2 pad) (* line-h (count labels)))
+          [mx my] pointer
+          x (max 8 (min (double mx) (max 8.0 (- (q/width) box-w 8))))
+          y (let [below (+ (double my) 16)]
+              (if (< (+ below box-h) (q/height))
+                below
+                (max 8.0 (- (double my) box-h 8))))]
+      (rgb [18 22 24] 240)
+      (q/no-stroke)
+      (q/rect x y box-w box-h 4)
+      (q/stroke-weight 1)
+      (stroke-rgb line 1)
+      (q/no-fill)
+      (q/rect x y box-w box-h 4)
+      (q/text-align :left :top)
+      (q/text-size 12)
+      (doseq [[i d] (map-indexed vector deps)]
+        (rgb (if (:violating d) violation ink))
+        (q/text (dep-label d) (+ x pad) (+ y pad (* i line-h)))))))
 
 (defn- draw-btn [r label]
   (rgb [42 61 54])
@@ -378,9 +412,21 @@
     (q/text-size 16)
     (rgb gold)
     (q/text "Inspector" (+ x 16) 16)
+    (let [real (layout/real-diagram-rect w)
+          real-on? (nil? selected)
+          real-label (or (get-in state [:doc :title]) "Real diagram")]
+      (when real-on?
+        (rgb gold 40)
+        (q/no-stroke)
+        (q/rect (:x real) (:y real) (:w real) (:h real) 3))
+      (q/text-align :left :center)
+      (q/text-size 12)
+      (rgb (if real-on? gold ink))
+      (q/text real-label (+ (:x real) 6) (geom/cy real)))
+    (q/text-align :left :top)
     (q/text-size 11)
     (rgb muted)
-    (q/text "Proposals" (+ x 16) 36)
+    (q/text "Proposals" (+ x 16) layout/proposals-label-y)
     (doseq [[i p] (map-indexed vector ps)
             :let [r (layout/proposal-row-rect w i)]]
       (when (= selected (:id p))
@@ -392,16 +438,17 @@
       (rgb (if (= selected (:id p)) gold ink))
       (q/text (or (:name p) (name (:id p)))
               (+ (:x r) 6) (geom/cy r)))
-    (draw-btn (layout/new-proposal-rect w n) "New")
+    (draw-btn (layout/new-proposal-rect w n) "New Proposal")
     (draw-btn (layout/declutter-rect w n)
-              (get declutter-label (or (:declutter state) :full) "Full"))
+              (get declutter-label (or (:declutter state) :full)
+                   "Declutter none"))
     x))
 
 (defn- draw-sidebar-empty [x y]
   (rgb muted)
   (q/text-align :left :top)
   (q/text-size 12)
-  (q/text "Click a component for its card.\nDouble-click a layer to open it.\nEsc (or ←) goes up a level.\nScroll to pan; Shift-scroll for horizontal.\nCtrl+/− zoom 10%; Ctrl+0 resets.\nR reloads. P returns to the ns tree.\nClick a proposal to show it."
+  (q/text "Click a component for its card.\nDouble-click a component to open it.\nEsc (or ←) goes up a level.\nScroll to pan; Shift-scroll for horizontal.\nCtrl+/− zoom 10%; Ctrl+0 resets.\nR reloads.\nClick the real diagram above Proposals,\nor a proposal to show it."
           (+ x 16) y))
 
 (defn- draw-sidebar-class [x y scene id]
@@ -531,7 +578,10 @@
                     (or (nil? b) (in-view? b cam-x cam-y world-w world-h)))]
       (draw-edge e
                  (or (= sel-id (:from e)) (= sel-id (:to e))
-                     (contains? (:via-ids e) sel-id))
+                     (contains? (:via-ids e) sel-id)
+                     (and (= :edge (:kind hover))
+                          (= (:from e) (:from hover))
+                          (= (:to e) (:to hover))))
                  scene))
     (doseq [c (remove :dummy? (:classes scene))
             :when (or (in-view? (:rect c) cam-x cam-y world-w world-h)
@@ -553,10 +603,7 @@
         (q/text-size 16)
         (q/text (or (get-in state [:scene :diagram :title])
                     "PROPOSAL — not instantiated in code")
-                12 8)
-        (q/text-size 12)
-        (rgb muted)
-        (q/text "P returns to the namespace tree." 12 28))
+                12 8))
       (do
         (rgb muted)
         (q/text-size 12)
@@ -565,7 +612,8 @@
     (rgb gold)
     (q/text-align :left :top)
     (q/text-size 14)
-    (q/text (str "← " (str/join "." (map name (:focus state)))) 12 28)))
+    (q/text (str "← " (str/join "." (map name (:focus state)))) 12 28))
+  (draw-edge-popup (:hover state) (:pointer state)))
 
 (defn- detail-row-color [row]
   (case (:kind row)

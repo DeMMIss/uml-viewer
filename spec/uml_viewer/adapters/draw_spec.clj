@@ -373,7 +373,7 @@
         (call 'draw-sidebar {:selected nil :scene (scene)})
         (should-contain "Inspector" (texts log))
         (should (some #(re-find #"Click a component" %) (texts log)))
-        (should (some #(re-find #"Double-click a layer" %) (texts log))))))
+        (should (some #(re-find #"Double-click a component" %) (texts log))))))
 
   (it "shows class name, package, CRAP, and members"
     (record-quil
@@ -443,7 +443,19 @@
           (reset! log [])
           (call 'draw-edge e true s)
           (should (painted? log :stroke draw/violation-hot))
-          (should-contain [:stroke-weight 3.2] @log))))))
+          (should-contain [:stroke-weight 3.2] @log)))))
+
+  (it "lists hovered deps as x -> y with violating rows in red"
+    (record-quil
+      (fn [log]
+        (call 'draw-edge-popup
+              {:kind :edge
+               :deps [{:from :a :to :b :violating false}
+                      {:from :ir :to :layout :violating true}]}
+              [40 40])
+        (should-contain "a -> b" (texts log))
+        (should-contain "ir -> layout" (texts log))
+        (should (painted? log :fill draw/violation))))))
 
 (describe "draw-detail-row"
   (it "washes the hovered row and mutes private members"
@@ -552,7 +564,7 @@
                      :cam-x 0 :cam-y 0}]
           (call 'draw-state state)
           (should-contain "PROPOSAL — not instantiated in code" (texts log))
-          (should-contain "P returns to the namespace tree." (texts log))
+          (should-not-contain "P returns to the namespace tree." (texts log))
           (should (painted? log :fill draw/gold)))))))
 
 (describe "draw-detail"

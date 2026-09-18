@@ -4,8 +4,9 @@ The diagram is already on screen.
 
 - Do **not** edit `examples/uml-viewer.edn`. It is generated from
   `examples/uml-viewer.policy.edn` via `clj -M:ir`.
-- Policy follows **namespace nesting**, not invented layers. Dots after
-  the prefix are the tree. Do not add Domain/Engine-style packages.
+- Policy follows **namespace nesting**, not invented layers/components.
+  Dots after the prefix are the tree. Do not add Domain/Engine-style
+  packages. **Layer** and **component** mean the same thing.
 - `:proposals` are named groupings that are **not** in the source. Preserve
   them when rewriting policy. Do not invent them on launch. The inspector
   lists them; **P** returns to the namespace tree. If instructed, add a

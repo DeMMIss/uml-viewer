@@ -36,4 +36,4 @@
       (do
         (sketch/start! path source-impl restart?)
         (println "Watching" path)
-        (println "Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). Ctrl+/− zoom; Ctrl+0 resets. R reloads. P returns to the namespace tree. Inspector lists proposals.")))))
+        (println "Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). Ctrl+/− zoom; Ctrl+0 resets. R reloads. Click the real diagram above Proposals, or a proposal to show it.")))))

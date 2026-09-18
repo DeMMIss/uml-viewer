@@ -73,37 +73,40 @@
                                        :window-h 800 :view-w view-w})]
       (should= (double (- 1400 view-w)) (:cam-x next))))
 
-  (it "toggles the proposal root view on p and ignores p when none is defined"
+  (it "returns to the real diagram from a proposal via the inspector link"
     (let [doc {:hierarchical true
                :title "Demo"
-               :proposal {:notice "PROPOSAL — not instantiated in code"
-                          :layers [{:id :kernel :label "Kernel" :nses [:domain]}]}
+               :proposals [{:id :ccp :name "CCP"
+                            :layers [{:id :kernel :label "Kernel" :nses [:domain]}]}]
                :classes [{:id :domain :name "Domain" :ns "demo.domain"}
                          {:id :engine :name "Engine" :ns "demo.engine"}]
                :edges []
                :order [:domain :engine]}
-          s {:doc doc :path "examples/library.edn" :focus [] :proposal false
-             :scene {:classes []} :cam-x 0 :cam-y 0 :selected nil}
-          on (events/on-key s :p)
-          off (events/on-key on :p)
-          plain (events/on-key (dissoc s :doc) :p)]
-      (should (:proposal on))
-      (should (:proposal-id on))
-      (should= [] (:focus on))
-      (should (get-in on [:scene :diagram :proposal]))
+          s {:doc doc :path "examples/library.edn" :focus [] :proposal-id :ccp
+             :proposal true :scene {:classes []} :cam-x 0 :cam-y 0 :selected nil}
+          w 1500
+          real (layout/real-diagram-rect w)
+          hit (events/inspector-hit s (geom/cx real) (geom/cy real) w)
+          off (events/on-inspector-press s hit)
+          p-key (events/on-key s :p)]
+      (should= :real-diagram (:kind hit))
       (should-not (:proposal off))
       (should-not (:proposal-id off))
       (should-not (get-in off [:scene :diagram :proposal]))
-      (should= plain (events/on-key plain :p))))
+      (should= s p-key)))
 
-  (it "hits proposal rows, New, and Declutter in the inspector"
+  (it "hits the real diagram, proposal rows, New Proposal, and Declutter"
     (let [doc {:proposals [{:id :a :name "A" :layers []}
                            {:id :b :name "B" :layers []}]}
           s {:doc doc}
           w 1500
+          real (layout/real-diagram-rect w)
           r0 (layout/proposal-row-rect w 0)
           nr (layout/new-proposal-rect w 2)
           dr (layout/declutter-rect w 2)]
+      (should= :real-diagram (:kind (events/inspector-hit s (geom/cx real) (geom/cy real) w)))
+      (should (< (+ (:y real) (:h real)) layout/proposals-label-y))
+      (should (< layout/proposals-label-y (:y r0)))
       (should= :a (:id (events/inspector-hit s (+ (:x r0) 2) (+ (:y r0) 2) w)))
       (should= :new-proposal (:kind (events/inspector-hit s (geom/cx nr) (geom/cy nr) w)))
       (should= :declutter (:kind (events/inspector-hit s (geom/cx dr) (geom/cy dr) w)))
@@ -137,11 +140,11 @@
       (should= :proposal.kernel (:open-layer opened))
       (should-be-nil (:open-layer back))))
 
-  (it "cycles declutter Full → arrows → methods → classes → Full"
+  (it "cycles declutter none → arrows → elements → classes → none"
     (let [s {:declutter :full}]
       (should= :arrows (:declutter (events/cycle-declutter s)))
-      (should= :methods (:declutter (events/cycle-declutter {:declutter :arrows})))
-      (should= :classes (:declutter (events/cycle-declutter {:declutter :methods})))
+      (should= :elements (:declutter (events/cycle-declutter {:declutter :arrows})))
+      (should= :classes (:declutter (events/cycle-declutter {:declutter :elements})))
       (should= :full (:declutter (events/cycle-declutter {:declutter :classes})))))
 
   (it "declutters a full hierarchical diagram even when an edge end is missing"
@@ -189,9 +192,11 @@
     (let [s (state)
           a (first (filter #(= :a (:id %)) (:classes (:scene s))))
           [x y] [(geom/cx (:rect a)) (geom/cy (:rect a))]]
-      (let [h (:hover (events/on-move s x y))]
+      (let [moved (events/on-move s x y)
+            h (:hover moved)]
         (should= :class (:kind h))
-        (should= :a (:id h)))))
+        (should= :a (:id h))
+        (should= [x y] (:pointer moved)))))
 
   (it "reads wheel amount from a map and ignores junk"
     (let [s (assoc (state) :scene {:size {:h 4000 :w 800}})]

@@ -130,6 +130,26 @@
               out (if (< u (- a 1.0e-9)) (conj out [u a]) out)]
           (recur (max u b) (rest ivs) out))))))
 
+(defn point-seg-dist
+  "Distance from point p to segment a–b."
+  [[px py] [ax ay] [bx by]]
+  (let [dx (double (- bx ax))
+        dy (double (- by ay))
+        len2 (+ (* dx dx) (* dy dy))]
+    (if (< len2 1.0e-12)
+      (Math/hypot (- px ax) (- py ay))
+      (let [t (max 0.0 (min 1.0 (/ (+ (* (- px ax) dx) (* (- py ay) dy)) len2)))
+            qx (+ ax (* t dx))
+            qy (+ ay (* t dy))]
+        (Math/hypot (- px qx) (- py qy))))))
+
+(defn near-polyline?
+  "True if p is within `pad` of any segment of `pts`."
+  [p pts pad]
+  (boolean
+    (some (fn [[a b]] (<= (point-seg-dist p a b) pad))
+          (partition 2 1 (vec pts)))))
+
 (defn- near? [p q]
   (< (Math/hypot (- (first p) (first q))
                  (- (second p) (second q)))

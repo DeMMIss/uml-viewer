@@ -496,6 +496,17 @@
         (call 'on-main-press s {:x 0 :y 0})
         (should= [true true false] @pinned))))
 
+  (it "anchors the proposal menu at the AWT mouse-down"
+    (let [panel (javax.swing.JPanel.)
+          awt (java.awt.event.MouseEvent.
+                panel java.awt.event.MouseEvent/MOUSE_PRESSED
+                0 0 41 17 1 false)
+          pe (MouseEvent. awt 0 MouseEvent/PRESS 0 100 200 3 1)
+          anchor (call 'popup-anchor pe 100 200)]
+      (should= panel (:invoker anchor))
+      (should= 41 (:x anchor))
+      (should= 17 (:y anchor))))
+
   (it "treats shift on the wheel event or the current applet as horizontal pan"
     (let [got (atom nil)
           wheel (MouseEvent. nil 0 MouseEvent/WHEEL Event/SHIFT 0 0 0 1)

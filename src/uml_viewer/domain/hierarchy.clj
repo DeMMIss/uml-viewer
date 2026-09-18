@@ -242,7 +242,7 @@
   (policy/named-proposals doc))
 
 (def declutter-modes
-  [:full :arrows :methods :classes])
+  [:full :arrows :elements :classes])
 
 (defn next-declutter
   [mode]
@@ -254,6 +254,11 @@
           (when (some #(= id (:id %)) (:classes p))
             (:id p)))
         (:packages view)))
+
+(defn- leaf-dep [e]
+  {:from (or (:orig-from e) (:from e))
+   :to (or (:orig-to e) (:to e))
+   :violating (boolean (:violating e))})
 
 (defn- merge-direction-edges [edges]
   (->> edges
@@ -268,9 +273,11 @@
                      via (into #{} (mapcat (fn [e]
                                              [(:from e) (:to e)
                                               (:orig-from e) (:orig-to e)])
-                                           es))]
+                                           es))
+                     deps (mapv leaf-dep es)]
                  (cond-> (assoc (dissoc best :violating :orig-from :orig-to)
-                           :via-ids (disj via nil))
+                           :via-ids (disj via nil)
+                           :deps deps)
                    viol (assoc :kind :dependency :violating true)))))))
 
 (defn- pkg-dummy [p]
@@ -325,15 +332,17 @@
                    vec)]
     (assoc view :edges (merge-direction-edges edges))))
 
-(defn hide-methods
-  "Drop fields and ops from class boxes."
+(defn hide-elements
+  "Drop nested names, fields, ops, and ports from class boxes."
   [view]
   (update view :packages
           (fn [pkgs]
             (mapv (fn [p]
                     (update p :classes
                             (fn [cs]
-                              (mapv #(assoc % :hide-members true) cs))))
+                              (mapv #(assoc (dissoc % :contents :in-deps :out-deps)
+                                       :hide-members true)
+                                    cs))))
                   pkgs))))
 
 (defn hide-classes
@@ -364,10 +373,10 @@
 
 (defn apply-declutter
   [view mode]
-  (let [mode (or mode :full)]
+  (let [mode ({:methods :elements} (or mode :full) (or mode :full))]
     (cond-> view
-      (#{:arrows :methods :classes} mode) collapse-arrows
-      (#{:methods :classes} mode) hide-methods
+      (#{:arrows :elements :classes} mode) collapse-arrows
+      (#{:elements :classes} mode) hide-elements
       (= :classes mode) hide-classes)))
 
 (defn proposal-view
@@ -377,14 +386,19 @@
   ([doc] (proposal-view doc nil))
   ([doc which]
    (let [root (view-at doc [])
-         boxes (mapcat :classes (:packages root))
-         by-id (into {} (map (juxt :id identity) boxes))
          named (or (when (and (map? which) (:layers which)) which)
                    (when which (policy/proposal-by-id doc which))
                    (first (policy/named-proposals doc)))
          proposal (or (policy/normalize-proposal named)
                       (policy/normalize-proposal (:proposal doc)))
          layers (or (:layers proposal) [])
+         ranks (policy/ranks-from-layers layers)
+         stamped (policy/restamp-ranks
+                   (mapcat :classes (:packages root))
+                   (:edges root)
+                   ranks)
+         boxes (:classes stamped)
+         by-id (into {} (map (juxt :id identity) boxes))
          claimed (set (mapcat :nses layers))
          extras (filterv #(not (claimed (:id %))) boxes)
          mk (fn [layer]
@@ -404,7 +418,8 @@
        (assoc root
          :title notice
          :proposal true
-         :packages pkgs)
+         :packages pkgs
+         :edges (:edges stamped))
        root))))
 
 (defn layer-view

@@ -34,16 +34,6 @@
   (rebuild (assoc state :proposal-id id :proposal (boolean id) :focus []
              :open-layer nil)))
 
-(defn toggle-proposal
-  "Switch the root view between the namespace tree and the current proposal."
-  [state]
-  (if (or (nil? (:doc state))
-          (empty? (hierarchy/named-proposals (:doc state))))
-    state
-    (if (:proposal-id state)
-      (show-proposal state nil)
-      (show-proposal state (:id (first (hierarchy/named-proposals (:doc state))))))))
-
 (defn cycle-declutter
   [state]
   (rebuild (assoc state :declutter (hierarchy/next-declutter (:declutter state)))))
@@ -102,7 +92,9 @@
                     (when (layout/in-rect? (layout/proposal-row-rect window-w i) x y)
                       {:kind :proposal :id (:id (nth ps i)) :index i}))
                   (range n))]
-    (or row
+    (or (when (layout/in-rect? (layout/real-diagram-rect window-w) x y)
+          {:kind :real-diagram})
+        row
         (when (layout/in-rect? (layout/new-proposal-rect window-w n) x y)
           {:kind :new-proposal})
         (when (layout/in-rect? (layout/declutter-rect window-w n) x y)
@@ -112,6 +104,7 @@
   "Left click on inspector proposal UI."
   [state hit]
   (case (:kind hit)
+    :real-diagram (show-proposal state nil)
     :proposal (show-proposal state (:id hit))
     :new-proposal (add-proposal state)
     :declutter (cycle-declutter state)
@@ -193,7 +186,9 @@
 
 (defn on-move [state x y]
   (let [[wx wy] (world-xy state x y)]
-    (assoc state :hover (hit/at (:scene state) wx wy))))
+    (assoc state
+      :hover (hit/at (:scene state) wx wy)
+      :pointer [x y])))
 
 (defn regen-hit?
   [x y window-w window-h]
@@ -295,5 +290,4 @@
               (back state)
               (assoc state :selected nil))
        :r (-> state (dissoc :waiting) (assoc :mtime 0))
-       :p (toggle-proposal state)
        state))))

@@ -12,8 +12,34 @@
                 {:kind :port :id (:id p) :parent (:id c) :dir :out}))
             (:out-ports c))))
 
+(defn deps-of
+  "Leaf `from -> to` pairs on an arrow, collapsed or not."
+  [e]
+  (or (seq (:deps e))
+      (when (and (:from e) (:to e))
+        [{:from (:from e)
+          :to (:to e)
+          :violating (boolean (:violating e))}])))
+
+(defn- edge-paths [e]
+  (or (seq (:strokes e))
+      (when (next (:points e)) [(:points e)])))
+
+(defn edge-at
+  "Arrow under world point [x y], or nil. Classes take priority in `at`."
+  ([scene x y] (edge-at scene x y 8.0))
+  ([scene x y pad]
+   (let [p [x y]]
+     (some (fn [e]
+             (when (some #(geom/near-polyline? p % pad) (edge-paths e))
+               {:kind :edge
+                :from (:from e)
+                :to (:to e)
+                :deps (vec (deps-of e))}))
+           (reverse (:edges scene))))))
+
 (defn at
-  "Topmost port, class, child row, or package under world point [x y]."
+  "Topmost port, class, child row, edge, or package under world point [x y]."
   [scene x y]
   (or (some (fn [c]
               (or (port-at c x y)
@@ -30,6 +56,7 @@
             (let [cs (:classes scene)
                   visible (vec (remove :dummy? cs))]
               (reverse (if (seq visible) visible cs))))
+      (edge-at scene x y)
       (some (fn [p]
               (when (geom/inside? (:rect p) x y)
                 {:kind :package :id (:id p)}))

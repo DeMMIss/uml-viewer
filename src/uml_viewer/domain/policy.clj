@@ -155,6 +155,13 @@
                 (range)
                 (level-groups policy))))
 
+(defn ranks-from-layers
+  "Inner-first proposal layers -> rank map. Same contract as `level-ranks`."
+  [layers]
+  (level-ranks {:levels (mapv (fn [layer]
+                                (if (map? layer) (or (:nses layer) []) layer))
+                              (or layers []))}))
+
 (defn- top-seg [id]
   (keyword (first (str/split (name id) #"\."))))
 
@@ -183,6 +190,13 @@
             (assoc e :violating true)
             (dissoc e :violating)))
         edges))
+
+(defn restamp-ranks
+  "Recompute `:level` on classes and `:violating` on edges from `ranks`.
+  Used when a proposal's layer order differs from document `:levels`."
+  [classes edges ranks]
+  {:classes (with-levels (mapv #(dissoc % :level) classes) ranks)
+   :edges (mark-violations edges ranks)})
 
 (defn merge-edges
   "Keep the strongest edge for each [from to] pair.

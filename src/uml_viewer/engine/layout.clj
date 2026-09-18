@@ -32,17 +32,29 @@
 (defn inspector-inner-w []
   (- sidebar-w (* 2 inspector-pad)))
 
+(def real-diagram-y 40)
+(def proposals-label-y 66)
+(def proposal-rows-y 82)
+
+(defn real-diagram-rect
+  "Clickable real (namespace-tree) diagram, just above Proposals."
+  [window-w]
+  {:x (inspector-x window-w)
+   :y real-diagram-y
+   :w (inspector-inner-w)
+   :h inspector-row-h})
+
 (defn proposal-row-rect
   [window-w i]
   {:x (inspector-x window-w)
-   :y (+ 48 (* i inspector-row-h))
+   :y (+ proposal-rows-y (* i inspector-row-h))
    :w (inspector-inner-w)
    :h inspector-row-h})
 
 (defn new-proposal-rect
   [window-w n]
   {:x (inspector-x window-w)
-   :y (+ 48 (* n inspector-row-h) inspector-btn-gap)
+   :y (+ proposal-rows-y (* n inspector-row-h) inspector-btn-gap)
    :w (inspector-inner-w)
    :h inspector-btn-h})
 
@@ -89,20 +101,22 @@
 
 (defn class-lines [c]
   (let [contents (:contents c)
-        fields (when (and (not (:hide-members c)) (empty? contents))
+        show-body? (not (:hide-members c))
+        fields (when (and show-body? (empty? contents))
                  (mapv :text (or (:fields c) [])))
-        ops (when (and (not (:hide-members c)) (empty? contents))
-              (mapv :text (remove :private (or (:ops c) []))))]
+        ops (when (and show-body? (empty? contents))
+              (mapv :text (remove :private (or (:ops c) []))))
+        kids (when show-body? contents)]
     (cond-> []
       (stereotype-line c) (conj {:kind :stereo :text (stereotype-line c)})
       true (conj {:kind :name :text (:name c)})
-      (seq contents) (conj {:kind :rule :text nil})
-      (seq contents) (into (map (fn [ch]
+      (seq kids) (conj {:kind :rule :text nil})
+      (seq kids) (into (map (fn [ch]
                                   {:kind :child
                                    :text (:name ch)
                                    :id (:id ch)
                                    :drill? (boolean (:drill? ch))})
-                                contents))
+                                kids))
       (seq fields) (conj {:kind :rule :text nil})
       true (into (map (fn [t] {:kind :field :text t}) fields))
       (seq ops) (conj {:kind :rule :text nil})

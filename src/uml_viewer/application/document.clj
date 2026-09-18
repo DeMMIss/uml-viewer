@@ -28,7 +28,7 @@
          open-layer (:open-layer opts)
          declutter (or (:declutter opts) :full)
          declutter (if open-layer
-                     (if (= declutter :classes) :methods declutter)
+                     (if (= declutter :classes) :elements declutter)
                      declutter)]
      (if (:hierarchical painted)
        (compose/compile-diagram

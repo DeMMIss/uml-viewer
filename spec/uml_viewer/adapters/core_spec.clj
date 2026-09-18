@@ -38,4 +38,4 @@
         (let [out (with-out-str (core/start! :src "doc.edn"))]
           (should= ["doc.edn" :src false] @args)
           (should (re-find #"Watching" out))
-          (should (re-find #"P returns to the namespace tree" out)))))))
+          (should (re-find #"real diagram above Proposals" out)))))))
