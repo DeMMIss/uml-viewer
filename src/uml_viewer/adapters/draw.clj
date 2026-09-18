@@ -17,6 +17,8 @@
 (def muted [157 184 168])
 (def gold [232 196 72])
 (def line [42 61 54])
+(def violation [196 42 36])
+(def violation-hot [255 64 48])
 
 (defn- mix [a b t]
   (int (+ a (* t (- b a)) 0.5)))
@@ -125,11 +127,19 @@
          :tip tip
          :behind behind}))))
 
+(defn- edge-ink [e selected?]
+  (cond
+    (and (:violating e) selected?) [violation-hot 3.2]
+    (:violating e) [violation 2.0]
+    selected? [gold 2.2]
+    :else [muted 1.4]))
+
 (defn- draw-edge [e selected? scene]
   (when-let [drawn (if (:strokes e)
                      e
                      (live-edge e scene))]
-    (stroke-rgb (if selected? gold muted) (if selected? 2.2 1.4))
+    (let [[c w] (edge-ink e selected?)]
+      (stroke-rgb c w))
     (q/no-fill)
     (q/stroke-cap :round)
     (doseq [sub (:strokes drawn)]

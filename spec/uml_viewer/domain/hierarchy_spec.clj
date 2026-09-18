@@ -24,6 +24,17 @@
    :order [:source :layout :ir]})
 
 (describe "hierarchy"
+  (it "collapses a violating leaf dependency onto the parent segments"
+    (let [g (update graph :edges conj {:from :ir :to :layout :kind :dependency})
+          p (assoc policy :levels [[:ir] [:layout]])
+          doc (policy/apply-policy p g)
+          view (hierarchy/view-at doc [])
+          e (first (filter #(and (= :ir (:from %)) (= :layout (:to %)))
+                           (:edges view)))]
+      (should (:violating (first (filter #(and (= :ir (:from %)) (= :layout (:to %)))
+                                         (:edges doc)))))
+      (should (:violating e))))
+
   (it "collapses leaf edges onto the first namespace segment"
     (let [doc (policy/apply-policy policy graph)
           view (hierarchy/view-at doc [])

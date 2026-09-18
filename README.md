@@ -119,7 +119,9 @@ To write a policy for a project:
 5. Optionally override a require with `:edge-kinds {[:from :to] :association}`
    using the **leaf** ids (`clojure-language.source-clojure`, not
    `clojure-language`).
-6. Run `clj -M:ir` (or Regen).
+6. Set `:levels` so the generator can mark dependency-rule violations
+   (see [Dependency rule](#dependency-rule)).
+7. Run `clj -M:ir` (or Regen).
 
 If `foo.bar` and `foo.bar.baz` both exist, the `bar` box lists `bar` (the
 module) and `baz` (the child). Double-click the layer to open that level;
@@ -143,6 +145,11 @@ Right (the ns tree):
  :hierarchical true
  :foreign [quil]
  :order [main adapters application engine source graph clojure-language domain]
+ :levels [[domain source graph clojure-language]
+          [engine]
+          [application]
+          [adapters]
+          [main]]
  :edge-kinds {[:engine.compose :engine.layout] :association}}
 ```
 
@@ -151,6 +158,7 @@ Right (the ns tree):
 | `:prefix` | Strip this from each ns; remaining dots are the tree |
 | `:hierarchical` | Namespace tree (default when `:packages` is omitted) |
 | `:order` | Order of **existing** top-level ns segments, not new layer names |
+| `:levels` | Groups of those segments, **inner (higher-level) first**. Same group = same rank |
 | `:edge-kinds` | Override parser kind for `[from to]` (usually `:association`) |
 | `:omit-edges` | Drop `[from to]` |
 | `:lang` | Which `LanguageGraph` to use (default `:clojure`) |
@@ -175,6 +183,32 @@ mutation because mutate exited non-zero.
 
 Hand-written sample IRs (e.g. `examples/library.edn`) are still valid; they
 are not generated.
+
+### Dependency rule
+
+A `:dependency` edge is **violating** when it runs from a **higher-level**
+(inner) component to a **lower-level** (outer) one. That is the Clean
+Architecture dependency rule: source-code dependencies point inward.
+
+Evaluation is deterministic given `:levels`:
+
+1. Take the first dotted segment of each end (`engine.layout` → `engine`).
+2. Look up that segment in `:levels`. Rank is the group's index; **smaller
+   is inner / higher-level**.
+3. If both ends have a rank and `from-rank < to-rank`, the edge is
+   `:violating true`. Same rank is allowed. `:implements` and
+   `:association` are never violating. Foreign / unranked ends are not
+   compared.
+4. Collapsed layer arrows keep the flag if any bundled leaf dependency was
+   violating. Remapping a pair to `:association` clears it.
+
+`:order` is visual box order, not rank. Nesting is not layering: you cannot
+infer inner vs outer from the namespace tree alone, so `:levels` must group
+segments that sit at the same architectural level (e.g. `domain`, `source`,
+and `graph`). Omit `:levels` and nothing is marked.
+
+The viewer draws a violating arrow **red**, and **bold red** when a selected
+element highlights it. Hand-written IR may set `:violating true` directly.
 
 ## Companion mailbox
 

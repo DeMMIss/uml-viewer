@@ -89,10 +89,11 @@
 (defn- as-edge [e]
   (when-not (and (:from e) (:to e))
     (throw (ex-info "edge needs :from and :to" {:edge e})))
-  {:from (as-id (:from e))
-   :to (as-id (:to e))
-   :kind (keyword (or (:kind e) :association))
-   :label (:label e)})
+  (cond-> {:from (as-id (:from e))
+           :to (as-id (:to e))
+           :kind (keyword (or (:kind e) :association))
+           :label (:label e)}
+    (true? (:violating e)) (assoc :violating true)))
 
 (defn normalize [raw]
   (let [diagram {:title (or (:title raw) "UML")

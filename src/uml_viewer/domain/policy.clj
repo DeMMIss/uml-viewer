@@ -54,13 +54,49 @@
   (get {:implements 4 :inheritance 4 :composition 3 :aggregation 2
         :association 1 :dependency 0} k 0))
 
+(defn level-ranks
+  "Top-level segment -> rank. Smaller is higher-level (inner)."
+  [policy]
+  (into {}
+        (mapcat (fn [rank group]
+                  (map (fn [seg] [(as-id seg) rank]) group))
+                (range)
+                (or (:levels policy) []))))
+
+(defn- top-seg [id]
+  (keyword (first (str/split (name id) #"\."))))
+
+(defn violating-dependency?
+  "True when a :dependency runs from a higher-level (inner) segment to a
+  lower-level (outer) one. Both ends must have a rank. Same rank is allowed."
+  [e ranks]
+  (and (= :dependency (:kind e))
+       (let [rf (get ranks (top-seg (:from e)))
+             rt (get ranks (top-seg (:to e)))]
+         (boolean (and rf rt (< rf rt))))))
+
+(defn mark-violations
+  "Set `:violating` on dependency edges that break the dependency rule."
+  [edges ranks]
+  (mapv (fn [e]
+          (if (violating-dependency? e ranks)
+            (assoc e :violating true)
+            (dissoc e :violating)))
+        edges))
+
 (defn merge-edges
-  "Keep the strongest edge for each [from to] pair."
+  "Keep the strongest edge for each [from to] pair.
+  A surviving :dependency is violating if any bundled edge was."
   [edges]
   (->> edges
        (group-by (juxt :from :to))
        vals
-       (mapv (fn [es] (apply max-key #(kind-rank (:kind %)) es)))))
+       (mapv (fn [es]
+               (let [best (apply max-key #(kind-rank (:kind %)) es)]
+                 (cond-> (dissoc best :violating)
+                   (and (= :dependency (:kind best))
+                        (some :violating es))
+                   (assoc :violating true)))))))
 
 (defn collapse-graph
   "Rewrite foreign classes to policy `:foreign` prefixes. Unlisted externals drop."
@@ -96,9 +132,11 @@
     (->> edges
          (remove #(contains? omit [(:from %) (:to %)]))
          (mapv (fn [e]
-                 (if-let [k (get kinds [(:from e) (:to e)])]
-                   (assoc e :kind k)
-                   e))))))
+                 (let [e (if-let [k (get kinds [(:from e) (:to e)])]
+                           (assoc e :kind k)
+                           e)]
+                   (cond-> e
+                     (not= :dependency (:kind e)) (dissoc :violating))))))))
 
 (defn- apply-kinds [edges diagram]
   (apply-edge-kinds edges (:edge-kinds diagram) (:omit-edges diagram)))
@@ -209,12 +247,16 @@
 (defn apply-policy
   "Turn a scanned graph and a policy into an IR document."
   [policy graph]
-  (let [graph (collapse-graph policy graph)]
+  (let [ranks (level-ranks policy)
+        graph (-> (collapse-graph policy graph)
+                  (update :edges mark-violations ranks))
+        levels (mapv (fn [group] (mapv as-id group)) (or (:levels policy) []))]
     (if (hierarchical? policy)
       {:title (or (:title policy) "UML")
        :hierarchical true
        :prefix (or (:prefix policy) "uml-viewer")
        :order (mapv as-id (or (:order policy) []))
+       :levels levels
        :edge-kinds (or (:edge-kinds policy) {})
        :omit-edges (or (:omit-edges policy) [])
        :classes (:classes graph)

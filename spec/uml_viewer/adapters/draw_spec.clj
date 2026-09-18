@@ -430,7 +430,20 @@
           (call 'draw-edge (dissoc e :head) false s)
           (should (painted? log :stroke draw/muted))
           (should-contain [:stroke-weight 1.4] @log)
-          (should-not-contain :triangle (kinds log)))))))
+          (should-not-contain :triangle (kinds log))))))
+
+  (it "paints a violating dependency red, bold red when selected"
+    (record-quil
+      (fn [log]
+        (let [s (scene)
+              e (assoc (first (:edges s)) :violating true :kind :dependency)]
+          (call 'draw-edge e false s)
+          (should (painted? log :stroke draw/violation))
+          (should-contain [:stroke-weight 2.0] @log)
+          (reset! log [])
+          (call 'draw-edge e true s)
+          (should (painted? log :stroke draw/violation-hot))
+          (should-contain [:stroke-weight 3.2] @log))))))
 
 (describe "draw-detail-row"
   (it "washes the hovered row and mutes private members"

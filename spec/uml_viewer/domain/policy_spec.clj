@@ -112,4 +112,31 @@
           layers (first (:diagrams doc))
           ir (first (filter #(= :ir (:id %))
                             (mapcat :classes (:packages layers))))]
-      (should= "uml-viewer.domain.ir" (:ns ir)))))
+      (should= "uml-viewer.domain.ir" (:ns ir))))
+
+  (it "marks a dependency from a higher-level segment to a lower-level one"
+    (let [ranks (policy/level-ranks
+                  {:levels [[:domain :source] [:engine] [:application]]})
+          bad {:from :domain.ir :to :application.events :kind :dependency}
+          ok {:from :application.events :to :domain.ir :kind :dependency}
+          same {:from :domain.ir :to :source :kind :dependency}
+          assoc {:from :domain.ir :to :application.events :kind :association}
+          impl {:from :source.clojure :to :source :kind :implements}]
+      (should= {:domain 0 :source 0 :engine 1 :application 2} ranks)
+      (should (policy/violating-dependency? bad ranks))
+      (should-not (policy/violating-dependency? ok ranks))
+      (should-not (policy/violating-dependency? same ranks))
+      (should-not (policy/violating-dependency? assoc ranks))
+      (should-not (policy/violating-dependency? impl ranks))
+      (should (:violating (first (policy/mark-violations [bad] ranks))))
+      (should-be-nil (:violating (first (policy/mark-violations [ok] ranks))))))
+
+  (it "keeps violating on a collapsed dependency and drops it for association"
+    (let [es [{:from :a :to :b :kind :dependency :violating true}
+              {:from :a :to :b :kind :dependency}]
+          merged (first (policy/merge-edges es))
+          assoc (first (policy/apply-edge-kinds
+                         [merged] {[:a :b] :association} []))]
+      (should (:violating merged))
+      (should= :association (:kind assoc))
+      (should-be-nil (:violating assoc)))))

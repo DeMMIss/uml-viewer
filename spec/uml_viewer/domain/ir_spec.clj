@@ -26,6 +26,12 @@
     (should-throw
       (ir/normalize (assoc tiny :edges [{:from :a :to :nope}]))))
 
+  (it "keeps :violating on a dependency edge"
+    (let [d (ir/normalize
+              (assoc tiny :edges [{:from :a :to :b :kind :dependency
+                                   :violating true}]))]
+      (should (:violating (first (:edges d))))))
+
   (it "keeps top-level foreign ovals and allows edges to them"
     (let [d (ir/normalize
               {:packages
