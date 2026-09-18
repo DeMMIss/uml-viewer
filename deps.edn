@@ -25,4 +25,9 @@
            :main-opts ["-m" "clj-mutate.core"]}
   :ir {:main-opts ["-m" "uml-viewer.main.ir-generator"]}
   :run {:extra-deps {quil/quil {:mvn/version "4.3.1563"}}
-        :main-opts ["-m" "uml-viewer.main.uml-viewer"]}}}
+        :main-opts ["-m" "uml-viewer.main.uml-viewer"]}
+  :uml-viewer {:extra-deps {quil/quil {:mvn/version "4.3.1563"}}
+               :main-opts ["-m" "uml-viewer.main.uml-viewer"]}
+  :uml-viewer-restart {:extra-deps {quil/quil {:mvn/version "4.3.1563"}}
+                       :main-opts ["-m" "uml-viewer.main.uml-viewer"
+                                   "--restart" "examples/uml-viewer.edn"]}}}

@@ -21,8 +21,6 @@ clj -M:run
 clj -M:run examples/library.edn
 clj -M:run examples/uml-viewer.edn
 clj -M:run --help
-clj -M:run --restart                 # new JVM, same Grok session
-clj -M:run --restart examples/uml-viewer.edn
 ```
 
 A **tmux** session `uml-viewer-grok` starts interactive Grok in the
@@ -34,16 +32,24 @@ instance — not every Grok in this repo — also runs `clj -M:crap`,
 `clj -M:mutate`, and IR generate after later changes. Project-wide rules live
 in `.grok/rules/uml-viewer.md`.
 
-`--restart` opens a new JVM on the current EDN and does **not** start a new
-Grok session. Use it after source changes so the window loads the new code
-while the companion keeps running. Closing the window still kills Grok. To
-recycle the window without killing Grok, write `:quit-for-restart` to
-`.uml-viewer/to-viewer.edn`, wait for the JVM to exit, then
-`clj -M:run --restart examples/uml-viewer.edn`. Do not SIGKILL.
+The examined project (and this one) must expose two aliases:
+
+| Alias | Who | What |
+|-------|-----|------|
+| `:uml-viewer` | anyone | Fresh window. Starts the companion. Waits for `:display`. |
+| `:uml-viewer-restart` | **associated agent only** | New JVM, same companion. Loads the EDN immediately. |
+
+Do **not** pass `--restart` (or use `:uml-viewer-restart`) unless you are that
+companion recycling the window after source changes. A stray `--restart`
+skips spawning Grok and leaves a diagram with no agent. The companion
+recycles the window by writing `:quit-for-restart` to
+`.uml-viewer/to-viewer.edn`, waiting for the JVM to exit, then
+`clj -M:uml-viewer-restart`. Do not SIGKILL. Closing the window still kills
+Grok.
 
 On a fresh start the canvas stays blank until the companion sends `:display`,
-with **Waiting for agent to create diagram.** `--restart` and `R` load the
-current EDN immediately and do not wait. A missing or unreadable file prints
+with **Waiting for agent to create diagram.** `R` reloads the current EDN
+immediately and does not wait. A missing or unreadable file prints
 `UML viewer: file not found: …` in the inspector instead of throwing.
 
 ```bash
@@ -226,7 +232,7 @@ Commands are `{:id n :op …}` with a rising `:id`. Writes are tmp-then-rename.
 |-------|---------|
 | `:display` | Viewer loads `:path` (relative to the project root) |
 | `:regen` | Grok rewrites hierarchical policy, regenerates IR, then `:display` |
-| `:quit-for-restart` | Viewer exits the JVM without killing Grok |
+| `:quit-for-restart` | Viewer exits the JVM without killing Grok. The associated agent then runs `clj -M:uml-viewer-restart`. |
 
 **Regen** in the inspector queues `:regen` and wakes Grok with literal text, a
 150ms pause, `C-m`, 50ms, then `C-j` (same timing as SwarmForge). The wake-up

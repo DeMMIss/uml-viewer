@@ -10,11 +10,15 @@ The diagram is already on screen.
   `src/` files (differential), then `clj -M:ir`. Uncovered mutants are
   coverage gaps: keep the snapshot; do not re-run the file or force a
   full mutation because mutate exited non-zero.
+- The examined project must have aliases `:uml-viewer` (fresh start:
+  spawn this companion, wait for `:display`) and `:uml-viewer-restart`
+  (new JVM, keep this session, load the EDN immediately). Add them if
+  they are missing.
 - Do not start the viewer on launch; EDN reloads when the file mtime
   changes. To restart it: write `:quit-for-restart` to
   `.uml-viewer/to-viewer.edn`, wait for the JVM to exit, then
-  `clj -M:run --restart <edn>`. Do not SIGKILL; closing the window
-  still kills Grok.
+  `clj -M:uml-viewer-restart`. Do not pass `--restart` except through
+  that alias. Do not SIGKILL; closing the window still kills Grok.
 
 Do not commit or push unless asked. Esc interrupts a turn in this terminal;
 do not kill the process on interrupt.

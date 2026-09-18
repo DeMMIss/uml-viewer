@@ -6,11 +6,13 @@
        "\n"
        "  edn-file          Diagram to watch (default: examples/library.edn).\n"
        "                    A fresh start waits for the companion Grok to send\n"
-       "                    :display unless you pass --restart or press R.\n"
+       "                    :display unless the associated agent recycles\n"
+       "                    the window with :uml-viewer-restart, or you press R.\n"
        "\n"
-       "  --restart         New JVM, keep the existing Grok tmux session.\n"
+       "  --restart         Associated agent only (via :uml-viewer-restart).\n"
+       "                    New JVM, keep the existing Grok tmux session.\n"
        "                    Loads the EDN immediately (does not wait for\n"
-       "                    :display).\n"
+       "                    :display). Do not use this if no companion is attached.\n"
        "\n"
        "  -h, --help        Print this help and exit.\n"))
 

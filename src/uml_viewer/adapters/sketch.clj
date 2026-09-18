@@ -46,10 +46,13 @@
        "A tmux wake-up means mail is waiting. If idle, read to-agent.edn\n"
        "and do that command. If busy, finish first. Do not send tmux yourself.\n"
        "After regen, write :display with the generated EDN path.\n"
+       "The examined project must have aliases :uml-viewer (fresh start: spawn\n"
+       "this companion, wait for :display) and :uml-viewer-restart (new JVM,\n"
+       "keep this session, load the EDN immediately). Add them if missing.\n"
        "Do not start the viewer on launch; it reloads EDN when the file mtime\n"
        "changes. To restart it: write :quit-for-restart, wait for the JVM to\n"
-       "exit, then clj -M:run --restart <edn>. Do not SIGKILL; closing the\n"
-       "window still kills Grok.\n"
+       "exit, then clj -M:uml-viewer-restart. Do not pass --restart except\n"
+       "through that alias. Do not SIGKILL; closing the window still kills Grok.\n"
        "Do not commit or push unless asked.\n"))
 
 (def launch-prompt

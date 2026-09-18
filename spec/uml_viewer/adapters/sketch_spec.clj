@@ -593,6 +593,7 @@
       (should (re-find #"invent" sketch/standing-rules))
       (should (re-find #"to-agent.edn" sketch/standing-rules))
       (should (re-find #":quit-for-restart" sketch/standing-rules))
+      (should (re-find #"uml-viewer-restart" sketch/standing-rules))
       (should-not (re-find #":reload" sketch/standing-rules))
       (should (some #{"GROK_THEME=terminal"} args))
       (should (some #{"status"} args))
