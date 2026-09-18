@@ -18,7 +18,7 @@
   :mutate {:extra-paths ["spec"]
            :extra-deps {io.github.unclebob/clj-mutate
                         {:git/url "https://github.com/unclebob/clj-mutate.git"
-                         :git/sha "911e707bf50b5d9999640b84b780cc6b3247f0fb"}
+                         :git/sha "1256a01433739712d62b13e20615c2b61762d3c7"}
                         org.clojure/tools.reader {:mvn/version "1.4.2"}
                         speclj/speclj {:mvn/version "3.12.2"}
                         quil/quil {:mvn/version "4.3.1563"}}

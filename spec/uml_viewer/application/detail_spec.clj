@@ -22,7 +22,8 @@
                            :cc 2
                            :crap 1.8
                            :killed 3
-                           :survived 1}
+                           :survived 1
+                           :uncovered 2}
                           {:name "hide" :private true :crap 4.0}]}
                    {:id :b :name "B"}]}]
        :edges [{:from :a :to :b :kind :dependency}]})))
@@ -72,8 +73,11 @@
       (should= "4.0" (:crap-s hide))
       (should= "3" (:killed-s go))
       (should= "1" (:survived-s go))
+      (should= "2" (:uncovered-s go))
       (should= "3" (:killed-s cls))
       (should= "1" (:survived-s cls))
+      (should= "2" (:uncovered-s cls))
+      (should= "---no mutation sites---" (:mut-note hide))
       (should= :b (:id rel))
       (should= :b (detail/rel-at rows (+ (:y rel) 1)))
       (should= "go" (:op-name go))
@@ -101,9 +105,9 @@
   (it "returns nil for an unknown class"
     (should-be-nil (detail/model (scene) :nope)))
 
-  (it "lays out Crap, CC, Cov, killed, and survived columns"
+  (it "lays out Crap, CC, Cov, killed, survived, and uncovered columns"
     (let [cols (detail/column-layout)]
-      (should= ["Crap" "CC" "Cov" "killed" "survived"] (map :label cols))
+      (should= ["Crap" "CC" "Cov" "killed" "survived" "uncovered"] (map :label cols))
       (should (apply < (map :left cols)))))
 
   (it "spans --crap-- and --mutation-- over their columns"

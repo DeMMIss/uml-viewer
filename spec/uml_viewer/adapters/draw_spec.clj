@@ -106,20 +106,18 @@
     (should= draw/muted (call 'detail-row-color {:kind :muted})))
 
   (it "colors detail cells by column"
-    (let [high {:coverage 0.9 :crap-n 0 :survived 0 :killed 4}
-          low {:coverage 0.2 :crap-n 24 :survived 2}
-          high-mut (draw/stroke-for (config/mutation-grade
-                                      (config/mutation-ratio high)))
-          low-mut (draw/stroke-for (config/mutation-grade
-                                     (config/mutation-ratio low)))]
+    (let [high {:coverage 0.9 :crap-n 0 :survived 0 :killed 4 :uncovered 0}
+          low {:coverage 0.2 :crap-n 24 :survived 2 :uncovered 3}]
       (should= (draw/coverage-ink 0.9) (call 'cell-color high {:id :cov}))
       (should= (draw/stroke-for (config/crap-grade 0)) (call 'cell-color high {:id :crap}))
-      (should= high-mut (call 'cell-color high {:id :survived}))
-      (should= high-mut (call 'cell-color high {:id :killed}))
+      (should= draw/good (call 'cell-color high {:id :survived}))
+      (should= draw/white (call 'cell-color high {:id :killed}))
+      (should= draw/good (call 'cell-color high {:id :uncovered}))
       (should= draw/muted (call 'cell-color high {:id :cc}))
       (should= draw/muted (call 'cell-color high {:id :name}))
-      (should= low-mut (call 'cell-color low {:id :survived}))
-      (should= low-mut (call 'cell-color low {:id :killed}))
+      (should= draw/violation (call 'cell-color low {:id :survived}))
+      (should= draw/white (call 'cell-color low {:id :killed}))
+      (should= draw/violation (call 'cell-color low {:id :uncovered}))
       (should= (draw/stroke-for (config/crap-grade 24)) (call 'cell-color low {:id :crap}))
       (should= (draw/coverage-ink 0.2) (call 'cell-color low {:id :cov})))))
 
@@ -487,7 +485,12 @@
           (should-contain "Z" (texts log)))
         (reset! log [])
         (call 'draw-detail-cells {:kind :stats} 10)
-        (should= [] (of log :text)))))
+        (should= [] (of log :text))
+        (reset! log [])
+        (call 'draw-detail-row {:kind :stats :text "idle"
+                                :mut-note "---no mutation sites---" :y 0 :h 18}
+              false)
+        (should-contain "---no mutation sites---" (texts log)))))
 
   (it "paints stats cells with coverage and mutation colors"
     (record-quil
@@ -495,17 +498,17 @@
         (let [row {:kind :stats :text "go" :y 40 :h 18
                    :op-name "go"
                    :crap-s "1.8" :cc-s "2" :cov-s "75%"
-                   :killed-s "3" :survived-s "1"
+                   :killed-s "3" :survived-s "1" :uncovered-s "2"
                    :coverage 0.75 :crap-n 1.8
-                   :killed 3 :survived 1}]
+                   :killed 3 :survived 1 :uncovered 2}]
           (call 'draw-detail-row row false)
           (should-contain "go" (texts log))
           (should-contain "75%" (texts log))
           (should-contain "1" (texts log))
+          (should-contain "2" (texts log))
           (should (painted? log :fill (draw/coverage-ink 0.75)))
-          (should (painted? log :fill (draw/stroke-for
-                                       (config/mutation-grade
-                                         (config/mutation-ratio row))))))))))
+          (should (painted? log :fill draw/violation))
+          (should (painted? log :fill draw/white)))))))
 
 (describe "draw-state"
   (it "paints titles, skips dummy classes, and translates the camera"

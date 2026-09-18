@@ -15,9 +15,11 @@
 (def bg [22 28 32])
 (def panel [26 36 40])
 (def ink [236 236 228])
+(def white [255 255 255])
 (def muted [157 184 168])
 (def gold [232 196 72])
 (def line [42 61 54])
+(def good [95 181 138])
 (def violation [196 42 36])
 (def violation-hot [255 64 48])
 
@@ -626,30 +628,37 @@
     :stats ink
     muted))
 
-(defn- mutation-ink [row]
-  (stroke-for (config/mutation-grade (config/mutation-ratio row))))
+(defn- count-ink [n]
+  (if (pos? (or n 0)) violation good))
 
 (defn- cell-color [row col]
   (case (:id col)
     :cov (coverage-ink (:coverage row))
     :crap (stroke-for (config/crap-grade (:crap-n row)))
-    :killed (mutation-ink row)
-    :survived (mutation-ink row)
+    :killed white
+    :survived (count-ink (:survived row))
+    :uncovered (count-ink (:uncovered row))
     :cc muted
     muted))
 
 (defn- draw-detail-cells [row y]
-  (doseq [col (detail/column-layout)]
-    (let [s (if (= :col-header (:kind row))
-              (:label col)
-              (get row (:key col)))]
-      (when s
-        (q/text-align :right :top)
-        (q/text-size 13)
-        (rgb (if (= :col-header (:kind row))
-               gold
-               (cell-color row col)))
-        (q/text s (:right col) y)))))
+  (if (and (not= :col-header (:kind row)) (:mut-note row))
+    (when-let [g (first (filter #(= :mutation (:id %)) (detail/group-layout)))]
+      (q/text-align :right :top)
+      (q/text-size 13)
+      (rgb muted)
+      (q/text (:mut-note row) (:right g) y))
+    (doseq [col (detail/column-layout)]
+      (let [s (if (= :col-header (:kind row))
+                (:label col)
+                (get row (:key col)))]
+        (when s
+          (q/text-align :right :top)
+          (q/text-size 13)
+          (rgb (if (= :col-header (:kind row))
+                 gold
+                 (cell-color row col)))
+          (q/text s (:right col) y))))))
 
 (defn- draw-detail-groups [y]
   (doseq [g (detail/group-layout)]

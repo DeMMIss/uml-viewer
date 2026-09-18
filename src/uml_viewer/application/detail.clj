@@ -13,7 +13,8 @@
    {:id :cc :label "CC" :key :cc-s :w 32 :group :crap}
    {:id :cov :label "Cov" :key :cov-s :w 44 :group :crap}
    {:id :killed :label "killed" :key :killed-s :w 52 :group :mutation}
-   {:id :survived :label "survived" :key :survived-s :w 68 :group :mutation}])
+   {:id :survived :label "survived" :key :survived-s :w 60 :group :mutation}
+   {:id :uncovered :label "uncovered" :key :uncovered-s :w 78 :group :mutation}])
 
 (def group-labels
   {:crap "--crap--"
@@ -88,19 +89,27 @@
   (when n
     (format "%.1f" (double n))))
 
-(defn- format-cells [{:keys [crap-mu cc coverage killed survived class-row?]}]
-  {:crap-s (when crap-mu
-             (if class-row?
-               (str (format-num crap-mu) "μ")
-               (format-num crap-mu)))
-   :crap-n crap-mu
-   :cc-s (when (and cc (not class-row?)) (str (long cc)))
-   :cov-s (layout/format-coverage coverage)
-   :coverage coverage
-   :killed-s (when killed (str (long killed)))
-   :survived-s (when survived (str (long survived)))
-   :killed killed
-   :survived survived})
+(defn- site-count [killed survived uncovered]
+  (+ (or killed 0) (or survived 0) (or uncovered 0)))
+
+(defn- format-cells [{:keys [crap-mu cc coverage killed survived uncovered class-row?]}]
+  (let [base {:crap-s (when crap-mu
+                        (if class-row?
+                          (str (format-num crap-mu) "μ")
+                          (format-num crap-mu)))
+              :crap-n crap-mu
+              :cc-s (when (and cc (not class-row?)) (str (long cc)))
+              :cov-s (layout/format-coverage coverage)
+              :coverage coverage
+              :killed killed
+              :survived survived
+              :uncovered uncovered}]
+    (if (zero? (site-count killed survived uncovered))
+      (assoc base :mut-note "---no mutation sites---")
+      (assoc base
+        :killed-s (when killed (str (long killed)))
+        :survived-s (when survived (str (long survived)))
+        :uncovered-s (when uncovered (str (long uncovered)))))))
 
 (defn- class-metrics [c]
   (let [ops (:ops c)]
@@ -108,14 +117,16 @@
      :crap-mu (crap-mu (:crap c))
      :coverage (:coverage c)
      :killed (or (:killed c) (sum-key ops :killed))
-     :survived (or (:survived c) (sum-key ops :survived))}))
+     :survived (or (:survived c) (sum-key ops :survived))
+     :uncovered (or (:uncovered c) (sum-key ops :uncovered))}))
 
 (defn- op-metrics [op]
   {:crap-mu (crap-mu (:crap op))
    :cc (:cc op)
    :coverage (:coverage op)
    :killed (:killed op)
-   :survived (:survived op)})
+   :survived (:survived op)
+   :uncovered (:uncovered op)})
 
 (defn- emit [acc kind text extra]
   (let [{:keys [rows y]} acc

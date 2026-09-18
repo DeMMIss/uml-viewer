@@ -31,7 +31,7 @@
   (cond
     (nil? x) nil
     (and (number? x) (>= x 0) (= (double x) (double (long x)))) (long x)
-    :else (throw (ex-info "killed/survived must be a non-negative integer" {:value x}))))
+    :else (throw (ex-info "killed/survived/uncovered must be a non-negative integer" {:value x}))))
 
 (defn- as-cc [x]
   (cond
@@ -53,6 +53,7 @@
                (contains? x :coverage) (assoc :coverage (as-coverage (:coverage x)))
                (contains? x :killed) (assoc :killed (as-count (:killed x)))
                (contains? x :survived) (assoc :survived (as-count (:survived x)))
+               (contains? x :uncovered) (assoc :uncovered (as-count (:uncovered x)))
                (contains? x :cc) (assoc :cc (as-cc (:cc x)))
                (contains? x :crap) (assoc :crap (as-crap (:crap x)))
                (true? (:private x)) (assoc :private true)
@@ -72,6 +73,7 @@
              :cc (as-cc (:cc c))
              :killed (as-count (:killed c))
              :survived (as-count (:survived c))
+             :uncovered (as-count (:uncovered c))
              :hide-members (boolean (:hide-members c))
              :fields (mapv as-member (:fields c))
              :ops (mapv as-member (:ops c))}

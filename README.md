@@ -323,7 +323,7 @@ at the current drill level. A hand-written IR with `:packages` (or
 `:diagrams`) is still a static diagram, e.g. `examples/library.edn`.
 
 Metrics on the class card do not have to be authored. If `.metrics/` is
-present, the overlay fills CC, coverage, CRAP, killed/survived, and any
+present, the overlay fills CC, coverage, CRAP, killed/survived/uncovered, and any
 functions found in the snapshots (including privates). Authored `:crap` /
 `:coverage` / `:ops` are the fallback when no snapshot exists.
 
@@ -359,7 +359,7 @@ Optional authored metrics, used when snapshots are missing:
 
 - `:crap` — a number (`μ`) or `{:mu :max :sigma}`
 - `:coverage` — ratio 0–1 on a class or op
-- `:cc`, `:killed`, `:survived`, `:private` on ops
+- `:cc`, `:killed`, `:survived`, `:uncovered`, `:private` on ops
 - `:hide-members true` — compact box
 
 Package and class **color** maps CRAP (`μ + σ`) and mutation score each onto
@@ -371,9 +371,10 @@ the upper-right show the two scores. The boxes no longer print μ / max / σ.
 
 On the class card, a `Crap μ … max … σ …` line sits above the table (max is
 the worst function in the namespace, not a sum). Column groups are labeled
-`--crap--` (Crap, CC, Cov) and `--mutation--` (killed, survived). The class
-row shows average CRAP with a `μ` suffix and omits CC. Killed and survived
-use the same mutation-grade colors as the **M** dot.
+`--crap--` (Crap, CC, Cov) and `--mutation--` (killed, survived, uncovered).
+The class row shows average CRAP with a `μ` suffix and omits CC. Killed is
+white. Survived and uncovered are green at 0 and red when nonzero. A row
+with no mutation sites shows `---no mutation sites---` instead of zeros.
 
 Edge `:kind` values:
 
