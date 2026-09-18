@@ -78,7 +78,8 @@
     (let [layers (vec (keep-indexed layer-from (or (:layers p) [])))]
       (when (seq layers)
         {:notice (or (:notice p) proposal-notice)
-         :layers layers}))
+         :layers layers
+         :omit (mapv as-id (or (:omit p) []))}))
     :else nil))
 
 (defn timestamp-name
@@ -96,6 +97,7 @@
       {:id id
        :name (str n)
        :layers layers
+       :omit (mapv as-id (or (:omit p) []))
        :notice (or (:notice p) proposal-notice)})))
 
 (defn named-proposals

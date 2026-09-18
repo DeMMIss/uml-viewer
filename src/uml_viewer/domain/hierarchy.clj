@@ -400,7 +400,8 @@
          boxes (:classes stamped)
          by-id (into {} (map (juxt :id identity) boxes))
          claimed (set (mapcat :nses layers))
-         extras (filterv #(not (claimed (:id %))) boxes)
+         omit (set (:omit proposal))
+         extras (filterv #(not (or (claimed (:id %)) (omit (:id %)))) boxes)
          mk (fn [layer]
               (let [cs (into [] (keep by-id (:nses layer)))]
                 (when (seq cs)

@@ -51,6 +51,17 @@
       (should= "Unassigned" (:label last-pkg))
       (should (some #{:ir} (map :id (:classes last-pkg))))))
 
+  (it "omits listed nses from Unassigned"
+    (let [p (assoc policy
+              :proposals [{:id :engine :name "Engine"
+                           :omit [:ir]
+                           :layers [{:id :engine :label "Engine" :nses [:layout]}]}])
+          doc (policy/apply-policy p graph)
+          view (hierarchy/proposal-view doc :engine)
+          ids (mapcat #(map :id (:classes %)) (:packages view))]
+      (should-not (some #{:ir} ids))
+      (should (some #{:source} ids))))
+
   (it "collapses arrows between proposal packages to one per direction"
     (let [p (assoc policy
               :proposal [{:id :kernel :label "Kernel" :nses [:ir :source]}
