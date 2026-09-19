@@ -57,7 +57,10 @@ The example uses a small synthetic project committed with the integration check.
 The Kotlin compiler's PSI parses declarations, types, and imports. The graph's
 first level is the **configured source module**, followed by packages and
 declarations; it is not an inferred Gradle build graph. Hilt set wiring is
-shown separately from source dependencies. Parse errors, ambiguous internal
+shown as derived associations separately from source dependencies. Only uniquely
+resolved `@Binds @IntoSet` contributions to `@Inject` constructor `Set<T>` parameters
+are connected; `@Provides`, component visibility, and complete qualifier resolution
+are outside this adapter's scope. Parse errors, ambiguous internal
 references, and unresolved Hilt bindings are recorded in the generated EDN's
 `:diagnostics`. Unresolved ordinary references are omitted. This is static architecture
 exploration, not compiler-resolved calls, a complete DI graph, or a build validator.
@@ -70,6 +73,8 @@ Absent coverage/CRAP/mutation data is **unknown**, rendered neutrally.
 
 Generated files contain local paths and source identities. Keep private-project
 policies and graphs under `.uml-viewer/`; do not commit them to a public fork.
+Open only diagrams you trust: source locations and regeneration policies refer
+to files on your machine.
 
 Runnable integration checks (use `scripts/clj.ps1` instead of `clj` on Windows):
 

@@ -263,7 +263,7 @@
 
 (defn- merge-direction-edges [edges]
   (->> edges
-       (group-by (juxt :from :to))
+       (group-by (juxt :from :to :derived))
        vals
        (mapv (fn [es]
                (let [viol (boolean (some :violating es))

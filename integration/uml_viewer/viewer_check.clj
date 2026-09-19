@@ -1,6 +1,7 @@
 (ns uml-viewer.viewer-check
   "Real file/renderer integration. Add --gui to render and capture a desktop window."
-  (:require [clojure.java.io :as io]
+  (:require [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [clojure.string :as str]
             [quil.core :as q]
             [uml-viewer.adapters.draw :as draw]
@@ -9,10 +10,12 @@
             [uml-viewer.application.detail :as detail]
             [uml-viewer.application.document :as document]
             [uml-viewer.application.events :as events]
+            [uml-viewer.domain.hierarchy :as hierarchy]
             [uml-viewer.engine.layout :as layout]
             [uml-viewer.kotlin-language.source-kotlin]
             [uml-viewer.main.ir-generator :as generator]
-            [uml-viewer.source :as source]))
+            [uml-viewer.source :as source])
+  (:import [java.nio.file Files]))
 
 (defn- check! [ok message]
   (when-not ok (throw (ex-info message {}))))
@@ -26,6 +29,37 @@
       (Thread/sleep 25))
     (check! (not (:regenerating? @sketch/!bridge)) "Local regeneration timed out")
     (sketch/update-state state)))
+
+(defn- relocation! []
+  (let [dir (.toFile (Files/createTempDirectory (.toPath (io/file ".uml-viewer")) "relocation-"
+                                               (make-array java.nio.file.attribute.FileAttribute 0)))
+        original (io/file dir "original")
+        moved (io/file dir "moved")
+        policy (io/file original "model.policy.edn")
+        graph (io/file original "model.edn")
+        moved-graph (io/file moved "model.edn")
+        moved-policy (io/file moved "model.policy.edn")]
+    (.mkdirs original)
+    (.mkdirs moved)
+    (spit policy (pr-str (assoc (edn/read-string (slurp "examples/android.policy.edn"))
+                               :src (.getCanonicalPath (io/file "integration/fixtures/kotlin-project")))))
+    (generator/regenerate (str policy) (str graph))
+    (check! (= "model.policy.edn" (:policy-file (edn/read-string (slurp graph))))
+            "Policy reference is not portable")
+    (io/copy policy moved-policy)
+    (io/copy graph moved-graph)
+    (Files/delete (.toPath policy))
+    (let [doc (edn/read-string (slurp moved-graph))
+          legacy (assoc doc :policy-file (.getAbsolutePath policy))
+          resolved (document/source-policy-path (str moved-graph) legacy)]
+      (check! (= (.getCanonicalPath moved-policy) (.getCanonicalPath (io/file resolved)))
+              "Moved legacy absolute policy reference did not find its sibling")
+      (document/write-proposals! (str moved-graph)
+                                (assoc doc :proposals [{:id :kept :name "Keep after move" :layers []}]))
+      (generator/regenerate (document/source-policy-path (str moved-graph) doc) (str moved-graph))
+      (check! (= :kept (get-in (edn/read-string (slurp moved-graph)) [:proposals 0 :id]))
+              "Regeneration lost a proposal after relocation"))
+    (println "Relocated policy, legacy path fallback and proposal persistence passed")))
 
 (defn- pipeline! []
   (let [path ".uml-viewer/integration.edn"
@@ -43,6 +77,15 @@
     (check! (str/includes? (source-window/source->html "Kotlin" (:body opened) (:line opened) :kotlin)
                           "<a name='here'></a>") "Source highlight was lost")
     (check! (nil? (draw/grade-of c)) "Missing Kotlin metrics received a grade")
+    (doseq [edges [(get-in state [:doc :edges])
+                   (get-in state [:scene :edges])
+                   (:edges (hierarchy/collapse-arrows (hierarchy/view-at (:doc state) [])))]]
+      (let [pair (filter #(or (= [:app.Consumer :data.impl.PluginImpl] [(:from %) (:to %)])
+                             (= [:app :data] [(:from %) (:to %)])) edges)]
+        (check! (some #(and (= :dependency (:kind %)) (not (:derived %))) pair)
+                "Hilt wiring erased a source dependency")
+        (check! (some #(and (= :association (:kind %)) (:derived %)) pair)
+                "Derived Hilt association was lost during policy/rendering")))
     (swap! sketch/!bridge assoc :standalone? true :regenerate generator/regenerate)
     (let [updated (regenerate! state)
           before (slurp path)
@@ -81,6 +124,7 @@
 (defn -main [& args]
   (try
     (let [state (pipeline!)]
+      (relocation!)
       (when (some #{"--gui"} args) (gui! state)))
     (shutdown-agents)
     (System/exit 0)

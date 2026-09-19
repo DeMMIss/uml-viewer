@@ -565,7 +565,7 @@
 
 (defn- local-regen! [state]
   (let [regenerate (:regenerate @!bridge)
-        policy-path (get-in state [:doc :policy-file])]
+        policy-path (document/source-policy-path (:path state) (:doc state))]
     (cond
       (:regenerating? @!bridge) (assoc state :mail-status "Regenerating...")
       (not (and regenerate policy-path))

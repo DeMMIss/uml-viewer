@@ -99,6 +99,7 @@
            :to (as-id (:to e))
            :kind (keyword (or (:kind e) :association))
            :label (:label e)}
+    (true? (:derived e)) (assoc :derived true)
     (true? (:violating e)) (assoc :violating true)))
 
 (defn normalize [raw]

@@ -201,11 +201,11 @@
    :edges (mark-violations edges ranks)})
 
 (defn merge-edges
-  "Keep the strongest edge for each [from to] pair.
+  "Keep the strongest edge for each [from to] pair, separating derived wiring.
   A surviving :dependency is violating if any bundled edge was."
   [edges]
   (->> edges
-       (group-by (juxt :from :to))
+       (group-by (juxt :from :to :derived))
        vals
        (mapv (fn [es]
                (let [best (apply max-key #(kind-rank (:kind %)) es)]

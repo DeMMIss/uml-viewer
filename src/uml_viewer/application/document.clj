@@ -194,13 +194,26 @@
                  ".policy.edn")]
       (when (.isFile (io/file p)) p))))
 
+(defn source-policy-path
+  "Resolve new EDN-relative references, legacy cwd paths, or a moved sibling policy."
+  [edn-path doc]
+  (let [recorded (some-> (:policy-file doc) io/file)
+        relative (when recorded
+                   (if (.isAbsolute recorded)
+                     recorded
+                     (io/file (.getParentFile (.getAbsoluteFile (io/file edn-path)))
+                              (str recorded))))
+        candidates (remove nil? [relative recorded (some-> (policy-path-for edn-path) io/file)])]
+    (some-> (or (first (filter #(.isFile %) candidates)) (first candidates))
+            .getPath)))
+
 (defn write-proposals!
   "Persist named proposals to the IR and, when present, the policy file."
   [edn-path doc]
   (let [proposals (mapv #(select-keys % [:id :name :layers])
                         (policy/named-proposals doc))
         doc (assoc doc :proposals proposals)
-        policy-path (or (:policy-file doc) (policy-path-for edn-path))]
+        policy-path (source-policy-path edn-path doc)]
     (when edn-path
       (spit edn-path (emit-doc doc)))
     (when (and policy-path (.isFile (io/file policy-path)))

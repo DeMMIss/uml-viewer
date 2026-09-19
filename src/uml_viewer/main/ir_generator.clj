@@ -8,9 +8,12 @@
     :clojure clj-graph/impl
     :kotlin (try
               @(requiring-resolve 'uml-viewer.kotlin-language.graph-kotlin/impl)
-              (catch ClassNotFoundException e
-                (throw (ex-info "Kotlin parsing requires the :kotlin alias (-M:kotlin:ir)."
-                                {:lang lang} e))))
+              (catch Exception e
+                (if-let [missing (some #(when (instance? ClassNotFoundException %) %)
+                                       (take-while some? (iterate ex-cause e)))]
+                  (throw (ex-info "Kotlin parsing requires the :kotlin alias (-M:kotlin:ir)."
+                                  {:lang lang :missing-class (.getMessage missing)}))
+                  (throw e))))
     (throw (ex-info "Unsupported source language" {:lang lang}))))
 
 (defn regenerate [policy-path out]

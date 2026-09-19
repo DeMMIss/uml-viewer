@@ -22,6 +22,13 @@
   (merge {:prefix (or (:prefix policy) "uml-viewer")}
          (select-keys policy [:modules])))
 
+(defn- policy-reference [policy-path out-path]
+  (let [policy (.toPath (.getCanonicalFile (io/file policy-path)))
+        parent (.getParent (.toPath (.getCanonicalFile (io/file out-path))))]
+    (try
+      (str/replace (str (.relativize parent policy)) "\\" "/")
+      (catch IllegalArgumentException _ (str policy)))))
+
 (defn- write-document! [path doc]
   (let [target (.toPath (.getAbsoluteFile (io/file path)))
         parent (.getParent target)]
@@ -56,10 +63,10 @@
                            (or (:src policy) "src")
                            (scan-options policy))
          extra (policy/unassigned policy graph)
+         out (or out-path (:out policy) "examples/uml-viewer.edn")
          doc (assoc (policy/apply-policy policy graph)
-               :policy-file (.getAbsolutePath (io/file policy-path))
-               :diagnostics (vec (:diagnostics graph)))
-         out (or out-path (:out policy) "examples/uml-viewer.edn")]
+               :policy-file (policy-reference policy-path out)
+               :diagnostics (vec (:diagnostics graph)))]
      (when (seq extra)
        (binding [*out* *err*]
          (println "Unassigned namespaces:"
