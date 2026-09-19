@@ -257,9 +257,10 @@
         (:packages view)))
 
 (defn- leaf-dep [e]
+  (merge (select-keys e [:label :derived])
   {:from (or (:orig-from e) (:from e))
    :to (or (:orig-to e) (:to e))
-   :violating (boolean (:violating e))})
+   :violating (boolean (:violating e))}))
 
 (defn- merge-direction-edges [edges]
   (->> edges

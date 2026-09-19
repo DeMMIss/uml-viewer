@@ -11,7 +11,8 @@
               (catch Exception e
                 (if-let [missing (some #(when (instance? ClassNotFoundException %) %)
                                        (take-while some? (iterate ex-cause e)))]
-                  (throw (ex-info "Kotlin parsing requires the :kotlin alias (-M:kotlin:ir)."
+                  (throw (ex-info (str "Kotlin parsing requires the :kotlin alias (-M:kotlin:ir) "
+                                       "and a working compiler classpath. Missing class: " (.getMessage missing))
                                   {:lang lang :missing-class (.getMessage missing)}))
                   (throw e))))
     (throw (ex-info "Unsupported source language" {:lang lang}))))

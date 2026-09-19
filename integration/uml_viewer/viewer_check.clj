@@ -12,6 +12,7 @@
             [uml-viewer.application.events :as events]
             [uml-viewer.domain.hierarchy :as hierarchy]
             [uml-viewer.engine.layout :as layout]
+            [uml-viewer.engine.hit :as hit]
             [uml-viewer.kotlin-language.source-kotlin]
             [uml-viewer.main.ir-generator :as generator]
             [uml-viewer.source :as source])
@@ -85,7 +86,9 @@
         (check! (some #(and (= :dependency (:kind %)) (not (:derived %))) pair)
                 "Hilt wiring erased a source dependency")
         (check! (some #(and (= :association (:kind %)) (:derived %)) pair)
-                "Derived Hilt association was lost during policy/rendering")))
+                "Derived Hilt association was lost during policy/rendering")
+        (check! (str/includes? (#'draw/dep-label (first (hit/deps-of (first (filter :derived pair)))))
+                              "[Hilt set]") "Hilt label was lost in the arrow tooltip")))
     (swap! sketch/!bridge assoc :standalone? true :regenerate generator/regenerate)
     (let [updated (regenerate! state)
           before (slurp path)
@@ -105,7 +108,12 @@
                   (fn [state]
                     (try
                       (check! (not (:waiting state)) "Standalone viewer waited for an agent")
-                      (original-draw (if (> @frames 20) (events/drill state :domain) state))
+                      (original-draw
+                        (if (> @frames 20)
+                          (events/drill state :domain)
+                          (assoc state :pointer [390 340]
+                                       :hover {:kind :edge :deps (hit/deps-of
+                                                                  (first (filter :derived (get-in state [:scene :edges]))))})))
                       (case (swap! frames inc)
                         20 (q/save-frame ".uml-viewer/integration-root.png")
                         40 (do (q/save-frame ".uml-viewer/integration-domain.png")

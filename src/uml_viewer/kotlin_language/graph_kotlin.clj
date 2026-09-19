@@ -148,6 +148,11 @@
           (when-let [receiver (.getReceiverTypeReference callable)] [receiver])
           (when-let [returns (.getTypeReference callable)] [returns])))
 
+(defn- property-type-sites [property excluded]
+  (type-sites :dependency
+              (keep identity [(.getReceiverTypeReference property) (.getTypeReference property)])
+              (into excluded (type-parameter-names property))))
+
 (defn- class-type-sites [^KtClassOrObject declaration inherited-params]
   (let [members (.getDeclarations declaration)
         functions (filter #(instance? KtNamedFunction %) members)
@@ -160,8 +165,7 @@
                        class-params)
            (mapcat #(type-sites :dependency (callable-type-refs %)
                                 (into class-params (type-parameter-names %))) functions)
-           (type-sites :dependency (keep #(.getTypeReference ^KtProperty %) properties)
-                       class-params)
+           (mapcat #(property-type-sites % class-params) properties)
            (type-sites :dependency
                        (mapcat #(keep (fn [p] (.getTypeReference ^KtParameter p))
                                       (.getValueParameters ^KtConstructor %)) constructors)
@@ -260,8 +264,7 @@
          :type-sites (vec (concat
                             (mapcat #(type-sites :dependency (callable-type-refs %)
                                                  (type-parameter-names %)) functions)
-                            (type-sites :dependency
-                                        (keep #(.getTypeReference ^KtProperty %) properties) #{})
+                            (mapcat #(property-type-sites % #{}) properties)
                             (mapcat #(type-sites :dependency [(.getTypeReference ^KtTypeAlias %)]
                                                  (type-parameter-names %)) aliases)))
          :bindings []
@@ -456,7 +459,9 @@
                                    :classes (mapv #(select-keys % [:ns :file]) xs)})))
                         vec)]
     (when (seq collisions)
-      (throw (ex-info "Kotlin class id collision" {:collisions collisions})))
+      (throw (ex-info (str "Kotlin class id collision: "
+                           (str/join ", " (map (comp str :id) collisions)))
+                      {:collisions collisions})))
     facts))
 
 (defn- scan-modules [factory root modules]

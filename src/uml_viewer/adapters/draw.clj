@@ -361,7 +361,8 @@
    :classes "Declutter classes"})
 
 (defn- dep-label [d]
-  (str (name (:from d)) " -> " (name (:to d))))
+  (str (name (:from d)) " -> " (name (:to d))
+       (when (:label d) (str " [" (:label d) "]"))))
 
 (defn- draw-edge-popup [hover pointer]
   (when (and (= :edge (:kind hover)) (seq (:deps hover)) (seq pointer))

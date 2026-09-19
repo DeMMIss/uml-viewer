@@ -39,7 +39,7 @@
     (doseq [id [:app.Consumer :app.LiteralConsumer :app.QualifiedConsumer
                 :domain.ExternalUser :domain.Plugin :domain.PluginCatalog :domain.Outer
                 :domain.Outer.Nested :domain.ContractsKt :domain.SamePackage
-                :domain.SameUser :domain.Result :domain.BuiltinNameUser
+                :domain.SameUser :domain.SamePackageKt :domain.Result :domain.BuiltinNameUser
                 :domain.Item :domain.T :domain.TypeParameterUser
                 :domain.LocalOwner :domain.LocalOwner.Plugin :domain.LocalOwner.User
                 :domain.GenericOuter :domain.GenericOuter.Inner
@@ -88,10 +88,13 @@
     (require! (not (edge? edges :domain.TypeParameterUser :domain.Item :dependency nil))
               "class type parameter resolved to project class" {:edges edges})
     (require! (not (edge? edges :domain.TypeParameterUser :domain.T :dependency nil))
-              "function type parameter resolved to project class" {:edges edges})
+              "function/property type parameter resolved to project class" {:edges edges})
+    (require! (not (edge? edges :domain.SamePackageKt :domain.T :dependency nil))
+              "top-level property type parameter resolved to project class" {:edges edges})
     (require! (not (edge? edges :domain.GenericOuter.Inner :domain.Item :dependency nil))
               "outer class type parameter resolved to project class" {:edges edges})
     (require! (and collision-error
+                   (str/includes? (.getMessage collision-error) "app.Duplicate")
                    (= :app.Duplicate (get-in (ex-data collision-error) [:collisions 0 :id]))
                    (= 2 (count (get-in (ex-data collision-error) [:collisions 0 :classes]))))
               "class id collision did not fail fast" {:error collision-error})

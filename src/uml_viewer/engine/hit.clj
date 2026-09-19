@@ -17,9 +17,10 @@
   [e]
   (or (seq (:deps e))
       (when (and (:from e) (:to e))
-        [{:from (:from e)
+        [(merge (select-keys e [:label :derived])
+         {:from (:from e)
           :to (:to e)
-          :violating (boolean (:violating e))}])))
+          :violating (boolean (:violating e))})])))
 
 (defn- edge-paths [e]
   (or (seq (:strokes e))
