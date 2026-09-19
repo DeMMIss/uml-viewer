@@ -17,10 +17,10 @@
 (def grade-worst 1.0)
 
 (defn crap-band
-  "Traffic light for a CRAP score. Missing counts as red."
+  "Traffic light for a CRAP score, or nil when it is unknown."
   [score]
   (if (nil? score)
-    :red
+    nil
     (let [{:keys [green yellow]} crap-thresholds]
       (cond
         (<= score green) :green
@@ -28,10 +28,10 @@
         :else :red))))
 
 (defn mutation-band
-  "Traffic light for a mutation score in 0–1. Missing counts as red."
+  "Traffic light for a mutation score in 0–1, or nil when it is unknown."
   [score]
   (if (nil? score)
-    :red
+    nil
     (let [{:keys [red yellow]} mutation-thresholds]
       (cond
         (<= score red) :red
@@ -61,10 +61,10 @@
     (+ (double (:mu crap)) (double (or (:sigma crap) 0)))))
 
 (defn crap-grade
-  "CRAP μ+σ on the 1–10 scale (10 is best). Missing counts as red (1)."
+  "CRAP μ+σ on the 1–10 scale (10 is best), or nil when it is unknown."
   [score]
   (if (nil? score)
-    grade-worst
+    nil
     (let [{:keys [green yellow red]} crap-thresholds]
       (along (double score) green yellow red
              grade-best grade-mid grade-worst))))
@@ -81,10 +81,10 @@
             (/ (double (or k 0)) n)))))))
 
 (defn mutation-grade
-  "Mutation ratio on the 1–10 scale (10 is best). Missing counts as red (1)."
+  "Mutation ratio on the 1–10 scale (10 is best), or nil when it is unknown."
   [score]
   (if (nil? score)
-    grade-worst
+    nil
     (let [{:keys [red yellow green]} mutation-thresholds]
       (along (double score) red yellow green
              grade-worst grade-mid grade-best))))
@@ -98,7 +98,7 @@
 
 (defn worse-crap
   "The CRAP map with higher μ+σ.
-  Nil is no candidate yet. A map with no μ counts as red."
+  Nil is no candidate yet. A map with no μ keeps the result unknown."
   [a b]
   (cond
     (nil? a) b
@@ -114,7 +114,7 @@
 
 (defn worse-mutants
   "The killed/survived pair with the lower (worse) mutation ratio.
-  Nil is no candidate yet. A pair with no ratio counts as red."
+  Nil is no candidate yet. A pair with no ratio keeps the result unknown."
   [a b]
   (cond
     (nil? a) b

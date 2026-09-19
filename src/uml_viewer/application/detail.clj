@@ -104,8 +104,11 @@
               :killed killed
               :survived survived
               :uncovered uncovered}]
-    (if (zero? (site-count killed survived uncovered))
+    (cond
+      (every? nil? [killed survived uncovered]) base
+      (zero? (site-count killed survived uncovered))
       (assoc base :mut-note "---no mutation sites---")
+      :else
       (assoc base
         :killed-s (when killed (str (long killed)))
         :survived-s (when survived (str (long survived)))

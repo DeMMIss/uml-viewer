@@ -77,7 +77,7 @@
       (should= "3" (:killed-s cls))
       (should= "1" (:survived-s cls))
       (should= "2" (:uncovered-s cls))
-      (should= "---no mutation sites---" (:mut-note hide))
+      (should-be-nil (:mut-note hide))
       (should= :b (:id rel))
       (should= :b (detail/rel-at rows (+ (:y rel) 1)))
       (should= "go" (:op-name go))
