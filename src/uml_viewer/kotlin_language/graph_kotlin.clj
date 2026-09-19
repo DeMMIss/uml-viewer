@@ -13,12 +13,6 @@
             KtFile KtNamedFunction KtObjectDeclaration KtParameter KtProperty
             KtPsiFactory KtSecondaryConstructor KtTypeAlias KtTypeReference KtUserType]))
 
-(def ^:private builtin-types
-  #{"Any" "Boolean" "Byte" "Char" "Double" "Float" "Int" "Long" "Nothing"
-    "Number" "Short" "String" "Unit" "Array" "Collection" "Iterable" "Iterator"
-    "List" "Map" "MutableCollection" "MutableIterable" "MutableIterator" "MutableList"
-    "MutableMap" "MutableSet" "Pair" "Result" "Sequence" "Set" "Triple"})
-
 (def ^:private non-qualifier-annotations
   #{"Assisted" "AssistedInject" "Binds" "HiltViewModel" "Inject" "InstallIn" "IntoMap"
     "IntoSet" "JvmSuppressWildcards" "Module" "Multibinds" "Provides" "Singleton"})
@@ -75,7 +69,7 @@
                (let [short (some-> entry .getShortName str)]
                  (when (and short (not (non-qualifier-annotations short)))
                    (str (imported-name context short)
-                        (some-> entry .getValueArgumentList .getText compact))))))
+                        (some-> entry .getValueArgumentList .getText))))))
        sort
        vec))
 
@@ -142,8 +136,11 @@
                      (.getName parameter) ": " (parameter-type parameter))}
          (span text parameter)))
 
-(defn- type-sites [relation refs]
-  (for [ref refs, name (type-names ref), :when (not (builtin-types name))]
+(defn- type-parameter-names [owner]
+  (into #{} (keep #(.getName %)) (.getTypeParameters owner)))
+
+(defn- type-sites [relation refs excluded]
+  (for [ref refs, name (type-names ref), :when (not (excluded name))]
     {:name name :relation relation :line (some-> ref .getTextOffset)}))
 
 (defn- callable-type-refs [callable]
@@ -151,40 +148,50 @@
           (when-let [receiver (.getReceiverTypeReference callable)] [receiver])
           (when-let [returns (.getTypeReference callable)] [returns])))
 
-(defn- class-type-sites [^KtClassOrObject declaration]
+(defn- class-type-sites [^KtClassOrObject declaration inherited-params]
   (let [members (.getDeclarations declaration)
         functions (filter #(instance? KtNamedFunction %) members)
         properties (filter #(instance? KtProperty %) members)
+        class-params (into inherited-params (type-parameter-names declaration))
         constructors (concat (when-let [primary (.getPrimaryConstructor declaration)] [primary])
                              (.getSecondaryConstructors declaration))]
     (vec (concat
-           (type-sites :super (keep #(.getTypeReference %) (.getSuperTypeListEntries declaration)))
+           (type-sites :super (keep #(.getTypeReference %) (.getSuperTypeListEntries declaration))
+                       class-params)
+           (mapcat #(type-sites :dependency (callable-type-refs %)
+                                (into class-params (type-parameter-names %))) functions)
+           (type-sites :dependency (keep #(.getTypeReference ^KtProperty %) properties)
+                       class-params)
            (type-sites :dependency
-                       (concat (mapcat callable-type-refs functions)
-                               (keep #(.getTypeReference ^KtProperty %) properties)
-                               (mapcat #(keep (fn [p] (.getTypeReference ^KtParameter p))
-                                              (.getValueParameters ^KtConstructor %)) constructors)))))))
+                       (mapcat #(keep (fn [p] (.getTypeReference ^KtParameter p))
+                                      (.getValueParameters ^KtConstructor %)) constructors)
+                       class-params)))))
 
-(defn- binding-facts [^KtClassOrObject declaration context]
+(defn- binding-facts [^KtClassOrObject declaration context class-params]
   (for [member (.getDeclarations declaration)
         :when (instance? KtNamedFunction member)
         :let [function ^KtNamedFunction member
-              annotations (annotation-names function)]
-        :when (annotations "Binds")]
-    {:implementation (some-> function .getValueParameters first .getTypeReference primary-type-name)
-     :interface (some-> function .getTypeReference primary-type-name)
+              annotations (annotation-names function)
+              implementation (some-> function .getValueParameters first .getTypeReference primary-type-name)
+              interface (some-> function .getTypeReference primary-type-name)
+              params (into class-params (type-parameter-names function))]
+        :when (and (annotations "Binds")
+                   (not (params implementation))
+                   (not (params interface)))]
+    {:implementation implementation
+     :interface interface
      :into-set (boolean (annotations "IntoSet"))
      :qualifier (qualifier-key function context)
      :line (.getTextOffset function)}))
 
-(defn- consumer-facts [^KtClassOrObject declaration context]
+(defn- consumer-facts [^KtClassOrObject declaration context class-params]
   (let [constructors (concat (when-let [primary (.getPrimaryConstructor declaration)] [primary])
                              (.getSecondaryConstructors declaration))]
     (for [constructor constructors
           :when ((annotation-names constructor) "Inject")
           parameter (.getValueParameters ^KtConstructor constructor)
           :let [element (set-element-name (.getTypeReference ^KtParameter parameter))]
-          :when element]
+          :when (and element (not (class-params element)))]
       {:interface element
        :qualifier (qualifier-key parameter context)
        :line (.getTextOffset parameter)})))
@@ -197,10 +204,11 @@
     (.hasModifier declaration KtTokens/ABSTRACT_KEYWORD) :abstract
     :else :class))
 
-(defn- class-facts [declaration outer {:keys [text package] :as context}]
+(defn- class-facts [declaration outer {:keys [text package] :as context} inherited-params]
   (when-let [simple (.getName ^KtClassOrObject declaration)]
     (let [fqn (str (when (seq package) (str package "."))
                    (when (seq outer) (str outer ".")) simple)
+          class-params (into inherited-params (type-parameter-names declaration))
           members (.getDeclarations ^KtClassOrObject declaration)
           constructors (concat (when-let [primary (.getPrimaryConstructor ^KtClassOrObject declaration)] [primary])
                                (.getSecondaryConstructors ^KtClassOrObject declaration))
@@ -217,13 +225,14 @@
                        :ops (vec (concat (map #(constructor-op text simple %) constructors)
                                          (map #(function-op text %) functions)))
                        :fields (vec fields)
-                       :type-sites (class-type-sites declaration)
-                       :bindings (vec (binding-facts declaration context))
-                       :consumers (vec (consumer-facts declaration context))
+                       :type-sites (class-type-sites declaration inherited-params)
+                       :bindings (vec (binding-facts declaration context class-params))
+                       :consumers (vec (consumer-facts declaration context class-params))
                        :context context}
                       (span text declaration))
           nested (filter #(instance? KtClassOrObject %) members)]
-      (cons fact (mapcat #(class-facts % (str (when (seq outer) (str outer ".")) simple) context)
+      (cons fact (mapcat #(class-facts % (str (when (seq outer) (str outer ".")) simple)
+                                             context class-params)
                          nested)))))
 
 (defn- facade-fact [^KtFile file context file-base]
@@ -248,10 +257,13 @@
                                                         (type-text (.getTypeReference alias)))}
                                             (span text alias)))
                                    aliases)))
-         :type-sites (vec (type-sites :dependency
-                                     (concat (mapcat callable-type-refs functions)
-                                             (keep #(.getTypeReference ^KtProperty %) properties)
-                                             (map #(.getTypeReference ^KtTypeAlias %) aliases))))
+         :type-sites (vec (concat
+                            (mapcat #(type-sites :dependency (callable-type-refs %)
+                                                 (type-parameter-names %)) functions)
+                            (type-sites :dependency
+                                        (keep #(.getTypeReference ^KtProperty %) properties) #{})
+                            (mapcat #(type-sites :dependency [(.getTypeReference ^KtTypeAlias %)]
+                                                 (type-parameter-names %)) aliases)))
          :bindings []
          :consumers []
          :context context
@@ -269,7 +281,7 @@
                         :module module})
         top-classes (filter #(instance? KtClassOrObject %) (.getDeclarations kt-file))
         file-base (str/replace (.getName file) #"\.kt$" "")
-        facts (concat (mapcat #(class-facts % nil context) top-classes)
+        facts (concat (mapcat #(class-facts % nil context #{}) top-classes)
                       (when-let [facade (facade-fact kt-file context file-base)] [facade]))
         errors (PsiTreeUtil/findChildrenOfType kt-file PsiErrorElement)]
     {:facts (vec facts)
@@ -299,44 +311,56 @@
                :ns (:fqn fact) :lang :kotlin :file file :source-root source-root)
         (dissoc :fqn))))
 
-(defn- candidates [fact type-name]
+(defn- candidate-tiers [fact type-name]
   (let [{:keys [package explicit stars]} (:context fact)
         parts (str/split type-name #"\.")
         head (first parts)
         suffix (when (> (count parts) 1) (str "." (str/join "." (rest parts))))
-        imported (map #(str % suffix) (get explicit head))
+        imported (mapv #(str % suffix) (distinct (get explicit head)))
         scopes (loop [fqn (:ns fact), acc []]
                  (let [i (str/last-index-of fqn ".")]
                    (if (and i (>= i (count package)))
                      (recur (subs fqn 0 i) (conj acc (str fqn "." type-name)))
-                     acc)))]
-    (distinct
-      (concat (when (str/includes? type-name ".") [type-name])
-              imported scopes
-              [(str (when (seq package) (str package ".")) type-name)]
-              (map #(str % "." type-name) stars)))))
+                     acc)))
+        qualified? (and (str/includes? type-name ".")
+                        (Character/isLowerCase ^char (first type-name)))]
+    {:direct (when qualified? [type-name])
+     :scopes (mapv vector scopes)
+     :imported imported
+     :same-package [(str (when (seq package) (str package ".")) type-name)]
+     :stars (mapv #(str % "." type-name) stars)}))
 
-(defn- resolve-type [index fact type-name]
-  (let [found (->> (candidates fact type-name) (mapcat #(get index %)) distinct vec)]
+(defn- project-resolution [index names]
+  (let [found (->> names (mapcat #(get index %)) distinct vec)]
     (cond
       (= 1 (count found)) {:class (first found)}
       (> (count found) 1) {:ambiguous found}
-      :else (let [{:keys [explicit]} (:context fact)
-                  parts (str/split type-name #"\.")
-                  imported (get explicit (first parts))
-                  suffix (when (> (count parts) 1) (str "." (str/join "." (rest parts))))]
-              (cond
-                (= 1 (count imported)) {:foreign (str (first imported) suffix)}
-                (and (str/includes? type-name ".")
-                     (Character/isLowerCase ^char (first type-name))) {:foreign type-name}
-                :else {})))))
+      :else nil)))
+
+(defn- resolve-type [index fact type-name]
+  (let [{:keys [direct scopes imported same-package stars]} (candidate-tiers fact type-name)
+        direct-result (project-resolution index direct)
+        scope-result (some #(project-resolution index %) scopes)
+        same-package-result (project-resolution index same-package)
+        star-result (project-resolution index stars)]
+    (cond
+      direct-result direct-result
+      (seq direct) {:foreign type-name}
+      scope-result scope-result
+      (> (count imported) 1) {:ambiguous-names imported}
+      (= 1 (count imported)) (or (project-resolution index imported)
+                                 {:foreign (first imported)})
+      same-package-result same-package-result
+      star-result star-result
+      :else {})))
 
 (defn- reference-edges [facts index]
   (reduce
     (fn [{:keys [edges foreign diagnostics] :as acc} fact]
       (reduce
         (fn [state {:keys [name relation line]}]
-          (let [{target :class external :foreign ambiguous :ambiguous}
+          (let [{target :class external :foreign ambiguous :ambiguous
+                 ambiguous-names :ambiguous-names}
                 (resolve-type index fact name)]
             (cond
               (and target (not= (:id fact) (:id target)))
@@ -351,11 +375,12 @@
                   (update :foreign conj external)
                   (update :edges conj {:from (:id fact) :to (keyword external) :kind :dependency}))
 
-              (seq ambiguous)
+              (or (seq ambiguous) (seq ambiguous-names))
               (update state :diagnostics conj
                       {:kind :ambiguous-reference :file (:file fact)
                        :line (line-at (get-in fact [:context :text]) line)
-                       :reference name :candidates (mapv :ns ambiguous)})
+                       :reference name
+                       :candidates (or (some->> ambiguous (mapv :ns)) ambiguous-names)})
 
               :else state)))
         acc (:type-sites fact)))
@@ -399,7 +424,7 @@
                   (update state :edges into
                           (map (fn [binding]
                                  {:from (:id consumer) :to (get-in binding [:implementation :id])
-                                  :kind :association :label "Hilt set"}) exact))
+                                  :kind :association :label "Hilt set" :derived true}) exact))
 
                   other
                   (update state :diagnostics conj
@@ -421,6 +446,18 @@
 
 (defn- foreign-class [fqn]
   {:id (keyword fqn) :name fqn :ns fqn :foreign true :lang :kotlin})
+
+(defn- ensure-unique-ids [facts]
+  (let [collisions (->> facts
+                        (group-by :id)
+                        (keep (fn [[id xs]]
+                                (when (> (count xs) 1)
+                                  {:id id
+                                   :classes (mapv #(select-keys % [:ns :file]) xs)})))
+                        vec)]
+    (when (seq collisions)
+      (throw (ex-info "Kotlin class id collision" {:collisions collisions})))
+    facts))
 
 (defn- scan-modules [factory root modules]
   (reduce
@@ -461,14 +498,15 @@
                               EnvironmentConfigFiles/JVM_CONFIG_FILES)
                 factory (KtPsiFactory. (.getProject environment) false)
                 parsed (scan-modules factory root modules)
-                facts (mapv #(decorate-fact % (:prefix opts)) (:facts parsed))
+                facts (ensure-unique-ids
+                        (mapv #(decorate-fact % (:prefix opts)) (:facts parsed)))
                 index (group-by :ns facts)
                 references (reference-edges facts index)
                 hilt (hilt-edges facts index)
                 edges (->> (concat (:edges references) (:edges hilt))
-                           (group-by (juxt :from :to :kind))
+                           (group-by (juxt :from :to :kind :derived))
                            vals
-                           (mapv #(or (first (filter :label %)) (first %))))]
+                           (mapv #(or (first (remove :label %)) (first %))))]
             {:classes (into (mapv public-class facts)
                             (map foreign-class (sort (:foreign references))))
              :edges edges

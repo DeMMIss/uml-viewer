@@ -5,10 +5,16 @@ import com.acme.domain.Plugin as Contract
 import dagger.Binds
 import dagger.Module
 import dagger.multibindings.IntoSet
+import javax.inject.Named
 
 @Module
 abstract class PluginModule {
     @Binds
     @IntoSet
     abstract fun bindPlugin(implementation: PluginImpl): Contract
+
+    @Binds
+    @IntoSet
+    @Named("a  b")
+    abstract fun bindSpacedPlugin(implementation: PluginImpl): Contract
 }
