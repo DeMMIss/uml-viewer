@@ -7,9 +7,13 @@ administrator access or change global environment variables.
 From the repository root:
 
 ```powershell
-powershell -File scripts/clj.ps1 -JavaHome C:\path\to\jdk-21 -M:kotlin:ir examples\project.policy.edn
-powershell -File scripts/clj.ps1 -JavaHome C:\path\to\jdk-21 -M:kotlin:run --standalone generated.edn
+& .\scripts\clj.ps1 -JavaHome C:\path\to\jdk-21 -M:kotlin:ir examples\android.policy.edn generated.edn
+& .\scripts\clj.ps1 -JavaHome C:\path\to\jdk-21 -M:kotlin:run --standalone generated.edn
 ```
+
+Use the call operator `&` from PowerShell. Windows PowerShell 5.1's
+`powershell.exe -File` changes colon arguments such as `-M:kotlin:ir` before
+the script receives them. The Android wrapper invokes the launcher correctly.
 
 `-JavaHome` takes precedence over `JAVA_HOME`, which takes precedence over
 `java` on `PATH`. The selected Java must report version 21 or newer. All

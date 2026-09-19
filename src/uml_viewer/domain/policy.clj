@@ -273,7 +273,8 @@
          (apply-kinds diagram)))))
 
 (defn- ir-class [c hide?]
-  (cond-> {:id (:id c) :name (:name c)}
+  (cond-> (merge (select-keys c [:lang :file :source-root :line :end-line :ops :fields])
+                {:id (:id c) :name (:name c)})
     (:ns c) (assoc :ns (:ns c))
     (:stereotype c) (assoc :stereotype (:stereotype c))
     (:foreign c) (assoc :shape :oval)

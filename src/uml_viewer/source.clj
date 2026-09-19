@@ -33,7 +33,7 @@
                     path)
            :file path
            :body src
-           :line (when named? (start-line impl src ident))
+           :line (when (or named? (:line ident)) (start-line impl src ident))
            :lang lang})))))
 
 (defn member-source

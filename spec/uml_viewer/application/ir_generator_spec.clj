@@ -132,7 +132,8 @@
     (let [seen (atom nil)
           written (atom nil)
           policy-f (edn-file (demo-policy {}))]
-      (with-redefs [spit (fn [path s] (reset! written [path s]))]
+      (with-redefs [uml-viewer.application.ir-generator/write-document!
+                    (fn [path doc] (reset! written [path (ir-generator/emit doc)]))]
         (let [out (ir-generator/generate (stub-scan seen [demo-a])
                                          (.getPath policy-f))]
           (should= "examples/uml-viewer.edn" out)
@@ -152,7 +153,8 @@
                                (.getPath policy-f)
                                (.getPath out-f)))
       (should= "" (str out))
-      (should= "Unassigned namespaces: demo.b, demo.c\n" (str err))))
+      (should= (str "Unassigned namespaces: demo.b, demo.c" (System/lineSeparator))
+               (str err))))
 
   (it "does not warn when every namespace is assigned"
     (let [out-f (java.io.File/createTempFile "uml-out" ".edn")

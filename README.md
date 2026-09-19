@@ -1,5 +1,10 @@
 # UML viewer
 
+This fork adds Kotlin/Android source graphs and standalone Windows usage to
+[unclebob/uml-viewer](https://github.com/unclebob/uml-viewer). Source code and
+generated diagrams stay local. No AI agent starts unless you explicitly use
+`--grok`.
+
 A live Quil app that lays out and draws UML from an EDN IR. A **policy** plus
 a language-specific parser write the topology; this tool displays it, routes
 the arrows, colors CRAP, and lets you click.
@@ -13,7 +18,8 @@ the IR. See [Policy](#policy).
 
 ## Run
 
-Needs Clojure CLI and Java 21+.
+Needs Clojure CLI and Java 21+. On Windows, use the pinned local
+[PowerShell launcher](docs/windows.md); no global Clojure installation is needed.
 
 ```bash
 clj -M:ir                            # policy → examples/uml-viewer.edn
@@ -23,7 +29,60 @@ clj -M:run examples/uml-viewer.edn
 clj -M:run --help
 ```
 
-A **tmux** session `uml-viewer-grok` starts interactive Grok in the
+The viewer loads the EDN immediately. **Regen** regenerates it locally from its
+policy in the background; **R** reloads an existing EDN. A failed regeneration
+keeps the previous diagram. Codex or Claude can update source/policy files in a
+separate session; no terminal integration or paid API is required.
+
+## Kotlin / Android
+
+```powershell
+powershell -File scripts/view-android.ps1 -JavaHome C:\path\to\jdk-21 -ProjectRoot C:\projects\my-app\android -Prefix com.example.app
+```
+
+The wrapper scans the explicit `app`, `domain`, and `data` main Kotlin source
+roots and writes a local policy and graph to ignored `.uml-viewer/`. It does
+not run Gradle or change the Android project's JDK. Keep using JDK 17 for an
+Android project that requires it; the viewer can use a separate JDK 21.
+
+For other module layouts, copy [examples/android.policy.edn](examples/android.policy.edn),
+adjust `:src`, `:prefix`, and `:modules`, and run from this repository:
+
+```bash
+clj -M:kotlin:ir examples/android.policy.edn
+clj -M:kotlin:run .uml-viewer/android.edn
+```
+
+The example uses a small synthetic project committed with the integration check.
+The Kotlin compiler's PSI parses declarations, types, and imports. The graph's
+first level is the **configured source module**, followed by packages and
+declarations; it is not an inferred Gradle build graph. Hilt set wiring is
+shown separately from source dependencies. Parse errors, ambiguous internal
+references, and unresolved Hilt bindings are recorded in the generated EDN's
+`:diagnostics`. Unresolved ordinary references are omitted. This is static architecture
+exploration, not compiler-resolved calls, a complete DI graph, or a build validator.
+Main source roots exclude generated and test code unless explicitly configured.
+
+Clicking a class or member opens its local file at the recorded declaration
+line. Regenerate after source edits so those locations remain current. Kotlin
+source is displayed as escaped plain text, without Clojure syntax coloring.
+Absent coverage/CRAP/mutation data is **unknown**, rendered neutrally.
+
+Generated files contain local paths and source identities. Keep private-project
+policies and graphs under `.uml-viewer/`; do not commit them to a public fork.
+
+Runnable integration checks (use `scripts/clj.ps1` instead of `clj` on Windows):
+
+```bash
+clj -M:kotlin:check-kotlin            # real PSI, imports, Hilt and source locations
+clj -M:kotlin:check-viewer            # policy → EDN → hierarchy → card → source
+clj -M:kotlin:check-viewer --gui      # desktop render and PNG captures; needs a display
+```
+
+## Optional upstream Grok companion
+
+Only `clj -M:run --grok ...` starts a **tmux** session `uml-viewer-grok` with
+interactive Grok in the
 **examined project's directory** (`--yolo --trust --rules …` plus a launch
 prompt). On start it writes a hierarchical policy from that project's
 namespaces and regenerates the IR. Type there; Esc is the real TUI interrupt.
@@ -32,11 +91,11 @@ instance — not every Grok in this repo — also runs `clj -M:crap`,
 `clj -M:mutate`, and IR generate after later changes. Project-wide rules live
 in `.grok/rules/uml-viewer.md`.
 
-The examined project (and this one) must expose two aliases:
+For this optional workflow, the examined project exposes these aliases:
 
 | Alias | Who | What |
 |-------|-----|------|
-| `:uml-viewer` | anyone | Fresh window. Starts the companion. Waits for `:display`. |
+| `:uml-viewer --grok` | anyone | Fresh window. Starts the companion. Waits for `:display`. |
 | `:uml-viewer-restart` | **associated agent only** | New JVM, same companion. Loads the EDN immediately. |
 
 Do **not** pass `--restart` (or use `:uml-viewer-restart`) unless you are that
@@ -47,7 +106,7 @@ recycles the window by writing `:quit-for-restart` to
 `clj -M:uml-viewer-restart`. Do not SIGKILL. Closing the window still kills
 Grok.
 
-On a fresh start the canvas stays blank until the companion sends `:display`,
+With `--grok`, the canvas stays blank until the companion sends `:display`,
 with **Waiting for agent to create diagram.** `R` reloads the current EDN
 immediately and does not wait. A missing or unreadable file prints
 `UML viewer: file not found: …` in the inspector instead of throwing.
@@ -96,8 +155,8 @@ Rename or move of a function is a new form: overlay does not match old names.
   horizontal. Pan can follow arrows that bow past the origin.
 - **Ctrl+** (or **Ctrl+=**) zooms in 10%; **Ctrl-** zooms out 10%;
   **Ctrl+0** restores 100%. Zoom keeps the view center still.
-- **Regen** in the inspector asks the companion to rewrite policy and IR
-  (see [Companion mailbox](#companion-mailbox)).
+- **Regen** rebuilds from the local policy. In optional `--grok` mode it asks
+  the companion to rewrite policy and IR (see [Companion mailbox](#companion-mailbox)).
 - `R` reloads the current EDN (the watcher also reloads on save). Overlay
   re-reads `.metrics/` on the next load.
 - `Esc` on the class card closes it. Closing the main window exits the app.
@@ -107,7 +166,7 @@ Rename or move of a function is a new form: overlay does not match old names.
 This project's diagram is **generated**. Do not edit `examples/uml-viewer.edn`.
 Edit `examples/uml-viewer.policy.edn`, then run `clj -M:ir` (or press Regen).
 
-The **parser** (`LanguageGraph`) reads source and emits facts: one class per
+The **Clojure parser** (`LanguageGraph`) reads source and emits facts: one class per
 project namespace, `:require` / `:use` of another project ns as
 `:dependency`, `requiring-resolve` of a quoted var as `:dependency` on that
 var's namespace, `defprotocol` as `:stereotype :interface`, `defrecord` /
@@ -117,13 +176,14 @@ become **foreign** classes. Members are not authored — overlay fills them from
 
 ### Do not invent layers (components)
 
-The tree **is** the namespaces. After `:prefix`, every `.` is a nesting
+For Clojure, the tree **is** the namespaces. After `:prefix`, every `.` is a nesting
 level. `uml-viewer.engine.layout` is a child of `engine`.
 `uml-viewer.clojure-language.source-clojure` is a child of `clojure-language`.
 The policy does **not** assign nses to invented packages. If you want Domain /
 Engine / Adapters boxes **in the source tree**, those segments must exist as
 namespaces. To **view** a grouping that is not in the code, use `:proposal`
 (see [Proposed components](#proposed-components)) — do not rewrite namespaces.
+Kotlin prepends the explicitly configured source module before the package tree.
 
 To write a policy for a project:
 
@@ -308,12 +368,13 @@ with `(graph/register! :java my-java-scanner)`. The scanner must satisfy
 Classes are `{:id :name :ns :stereotype}`. Edges are `{:from :to :kind}`
 (`:dependency` or `:implements`). The policy layer is language-neutral.
 
-**Clojure** (`uml-viewer.clojure-language.graph-clojure`) is the only
-implementation today: it reads `ns` forms (including prefix lists),
+**Clojure** (`uml-viewer.clojure-language.graph-clojure`) reads `ns` forms (including prefix lists),
 `requiring-resolve` of a quoted var (including nested calls), `defprotocol`,
 `defrecord`, and `deftype`. Java or C need a different parser; do not
 special-case languages in `policy` or `ir-generator`. Main constructs the
-implementation and passes it in.
+implementation and passes it in. **Kotlin** uses
+`uml-viewer.kotlin-language.graph-kotlin` with the `:kotlin` dependency alias
+and the explicit source modules described above.
 
 ## IR
 
@@ -364,9 +425,9 @@ Optional authored metrics, used when snapshots are missing:
 
 Package and class **color** maps CRAP (`μ + σ`) and mutation score each onto
 1–10 using `uml-viewer.domain.config` cutoffs, averages them, and paints a
-0–10 red–green fill. Missing CRAP or mutation data counts as red (grade 1),
-not unknown. Parents take the worst CRAP and worst mutation of their
-children, and a child with no data is the worst. A **C** and **M** dot in
+0–10 red–green fill. Missing CRAP or mutation data stays unknown and uses the
+neutral color. Parents take the worst available CRAP and mutation values;
+a child with missing data keeps that aggregate unknown. A **C** and **M** dot in
 the upper-right show the two scores. The boxes no longer print μ / max / σ.
 
 On the class card, a `Crap μ … max … σ …` line sits above the table (max is
@@ -423,14 +484,18 @@ extractor must satisfy `LanguageSource`:
 | `extract` | slice that member out of the file text |
 | `title` | window title |
 
-**Clojure** (`uml-viewer.clojure-language.source-clojure`) is the only
-implementation today: it maps `:ns` to `src/...clj` (or `.cljc` / `.cljs`)
+**Clojure** (`uml-viewer.clojure-language.source-clojure`) maps `:ns` to
+`src/...clj` (or `.cljc` / `.cljs`)
 and finds the top-level `(defn name …)` / `(defn- name …)` so the window can
 jump to that line. That locate/line step is not enough for Java or C — those
 need a parser or language server, and a richer identity (`:class`,
 `:signature`, `:file`). The protocol is the seam; do not special-case
 languages in the class card. Main constructs the extractor and passes it to
 Core.
+
+**Kotlin** (`uml-viewer.kotlin-language.source-kotlin`) uses the scanner's
+`:file`, `:source-root`, and declaration line metadata, including distinct
+locations for overloaded members. It does not need the compiler to display a file.
 
 Quil stays in `adapters.draw` and `adapters.sketch`. The rest of the engine
 does not depend on Processing.

@@ -287,7 +287,7 @@
                                                         ([_src ns op]
                                                          (reset! opened [ns op])))]
         (call 'detail-mouse-pressed {:scroll 0} {:y go-y})
-        (should= [(:ns model) "go"] @opened)
+        (should= {:ns (:ns model) :name "go"} @opened)
         (call 'detail-mouse-pressed {:scroll 0} {:y (+ (:y mod) 1)})
         (should= {:ns (:ns model)} @opened)
         (call 'detail-mouse-pressed {:scroll 0} {:y (+ (:y rel) 1)})

@@ -1,9 +1,11 @@
 (ns uml-viewer.application.ir-generator
   (:require [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [uml-viewer.graph :as graph]
-            [uml-viewer.domain.policy :as policy]))
+            [uml-viewer.domain.policy :as policy])
+  (:import [java.nio.file Files StandardCopyOption AtomicMoveNotSupportedException]))
 
 (defn read-policy [path]
   (edn/read-string (slurp path)))
@@ -16,11 +18,32 @@
                  pprint/*print-right-margin* 90]
          (with-out-str (pprint/pprint doc)))))
 
+(defn- scan-options [policy]
+  (merge {:prefix (or (:prefix policy) "uml-viewer")}
+         (select-keys policy [:modules])))
+
+(defn- write-document! [path doc]
+  (let [target (.toPath (.getAbsoluteFile (io/file path)))
+        parent (.getParent target)]
+    (Files/createDirectories parent (make-array java.nio.file.attribute.FileAttribute 0))
+    (let [temp (Files/createTempFile parent ".uml-" ".edn"
+                                     (make-array java.nio.file.attribute.FileAttribute 0))]
+      (try
+        (spit (.toFile temp) (emit doc) :encoding "UTF-8")
+        (try
+          (Files/move temp target (into-array StandardCopyOption
+                                             [StandardCopyOption/ATOMIC_MOVE
+                                              StandardCopyOption/REPLACE_EXISTING]))
+          (catch AtomicMoveNotSupportedException _
+            (Files/move temp target (into-array StandardCopyOption
+                                               [StandardCopyOption/REPLACE_EXISTING]))))
+        (finally (Files/deleteIfExists temp))))))
+
 (defn document
   "Scan source with `graph-impl` and apply `policy`. Returns the IR document."
   [graph-impl policy]
   (let [root (or (:src policy) "src")
-        opts {:prefix (or (:prefix policy) "uml-viewer")}
+        opts (scan-options policy)
         graph (graph/scan graph-impl root opts)]
     (policy/apply-policy policy graph)))
 
@@ -31,14 +54,19 @@
    (let [policy (read-policy policy-path)
          graph (graph/scan graph-impl
                            (or (:src policy) "src")
-                           {:prefix (or (:prefix policy) "uml-viewer")})
+                           (scan-options policy))
          extra (policy/unassigned policy graph)
          doc (assoc (policy/apply-policy policy graph)
-               :policy-file policy-path)
+               :policy-file (.getAbsolutePath (io/file policy-path))
+               :diagnostics (vec (:diagnostics graph)))
          out (or out-path (:out policy) "examples/uml-viewer.edn")]
      (when (seq extra)
        (binding [*out* *err*]
          (println "Unassigned namespaces:"
                   (str/join ", " (map :ns extra)))))
-     (spit out (emit doc))
+     (when (seq (:diagnostics graph))
+       (binding [*out* *err*]
+         (println "Source diagnostics:" (count (:diagnostics graph))
+                  "(recorded in the generated EDN)")))
+     (write-document! out doc)
      out)))

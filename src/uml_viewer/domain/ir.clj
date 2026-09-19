@@ -57,14 +57,17 @@
                (contains? x :cc) (assoc :cc (as-cc (:cc x)))
                (contains? x :crap) (assoc :crap (as-crap (:crap x)))
                (true? (:private x)) (assoc :private true)
-               (contains? x :name) (assoc :name (:name x)))
+               (contains? x :name) (assoc :name (:name x))
+               (:line x) (assoc :line (:line x))
+               (:end-line x) (assoc :end-line (:end-line x)))
     :else (throw (ex-info "member must be a string or map" {:value x}))))
 
 (defn- as-class [c]
   (let [name (or (:name c) (some-> (:id c) name))]
     (when-not name
       (throw (ex-info "class needs :name or :id" {:class c})))
-    (cond-> {:id (as-id (or (:id c) name))
+    (cond-> (merge (select-keys c [:lang :file :source-root :line :end-line])
+            {:id (as-id (or (:id c) name))
              :name name
              :shape (when (or (:foreign c) (= :oval (keyword (:shape c)))) :oval)
              :stereotype (:stereotype c)
@@ -76,7 +79,7 @@
              :uncovered (as-count (:uncovered c))
              :hide-members (boolean (:hide-members c))
              :fields (mapv as-member (:fields c))
-             :ops (mapv as-member (:ops c))}
+             :ops (mapv as-member (:ops c))})
       (:ns c) (assoc :ns (str (:ns c)))
       (some? (:level c)) (assoc :level (long (:level c))))))
 

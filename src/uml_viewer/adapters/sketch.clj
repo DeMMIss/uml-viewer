@@ -277,7 +277,7 @@
   (System/exit 0))
 
 (defn- exit-app! []
-  (when-not (:keep-agent @!bridge)
+  (when-not (or (:standalone? @!bridge) (:keep-agent @!bridge))
     (shutdown-children!))
   (halt-vm!))
 
@@ -374,11 +374,18 @@
           rows (detail/rows model)]
       (cond
         (detail/module-at rows y)
-        (source-window/open-member-window! (:source @!bridge) {:ns (:ns model)})
+        (source-window/open-member-window!
+          (:source @!bridge)
+          (select-keys (:class model) [:ns :lang :file :source-root :line :end-line]))
 
         (detail/member-at rows y)
-        (source-window/open-member-window! (:source @!bridge) (:ns model)
-                                           (detail/member-at rows y))
+        (let [member (detail/member-at rows y)
+              op (first (filter #(= member (:name %)) (get-in model [:class :ops])))]
+          (source-window/open-member-window!
+            (:source @!bridge)
+            (merge (select-keys (:class model) [:ns :lang :file :source-root])
+                   {:name member}
+                   (select-keys op [:line :end-line]))))
 
         (detail/rel-at rows y)
         (swap! !bridge assoc :pick (detail/rel-at rows y)))))
@@ -470,7 +477,11 @@
     state))
 
 (defn update-state [state]
-  (let [state (-> state document/maybe-reload document/poll-mail)]
+  (let [state (cond-> (document/maybe-reload state)
+                (not (:standalone? @!bridge)) document/poll-mail)
+        state (if-let [result (take-flag! :regen-result)]
+                (assoc state :mail-status result)
+                state)]
     (if (:quit-for-restart state)
       (do (quit-for-restart!) state)
       (apply-bridge-flags state))))
@@ -552,6 +563,25 @@
           (.add menu delete)
           (.show menu (:invoker anchor) (int (:x anchor)) (int (:y anchor))))))))
 
+(defn- local-regen! [state]
+  (let [regenerate (:regenerate @!bridge)
+        policy-path (get-in state [:doc :policy-file])]
+    (cond
+      (:regenerating? @!bridge) (assoc state :mail-status "Regenerating...")
+      (not (and regenerate policy-path))
+      (assoc state :mail-status "No source policy. R reloads this EDN file.")
+      :else
+      (do
+        (swap! !bridge assoc :regenerating? true)
+        (future
+          (try
+            (regenerate policy-path (:path state))
+            (swap! !bridge assoc :regen-result "Regenerated from local sources.")
+            (catch Exception e
+              (swap! !bridge assoc :regen-result (str "Regeneration failed: " (.getMessage e))))
+            (finally (swap! !bridge assoc :regenerating? false))))
+        (assoc state :mail-status "Regenerating...")))))
+
 (defn- on-main-press [state event]
   (let [[w h] (applet-size)
         x (:x event)
@@ -559,11 +589,13 @@
         in-sidebar? (>= x (- w layout/sidebar-w))]
     (cond
       (events/regen-hit? x y w h)
-      (let [root (overlay/metrics-root (:path state))
+      (if (:standalone? @!bridge)
+        (local-regen! state)
+        (let [root (overlay/metrics-root (:path state))
             {:keys [woke?]} (request-regen! root)]
         (assoc state :mail-status (if woke?
                                     "Regen requested."
-                                    "Regen queued; Grok session not attached.")))
+                                    "Regen queued; Grok session not attached."))))
 
       in-sidebar?
       (let [hit (events/inspector-hit state x y w)]
@@ -624,14 +656,17 @@
   ([path source-impl]
    (start! path source-impl false))
   ([path source-impl restart?]
-   (swap! !bridge assoc :source source-impl)
-   (when-not restart?
+   (start! path source-impl restart? {}))
+  ([path source-impl restart? {:keys [standalone? regenerate]}]
+   (swap! !bridge assoc :source source-impl :standalone? standalone?
+          :regenerate regenerate :keep-agent false :regenerating? false :regen-result nil)
+   (when-not (or restart? standalone?)
      (open-in-terminal! (overlay/metrics-root path)))
    (q/sketch
     :title "UML viewer"
     :size [window-width window-height]
     :features [:resizable]
-    :setup (fn [] (setup path restart?))
+    :setup (fn [] (setup path (or restart? standalone?)))
     :update #'update-state
     :draw #'draw/draw-state
     :mouse-pressed #'on-main-press

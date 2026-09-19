@@ -87,7 +87,7 @@
 
 (defn- format-num [n]
   (when n
-    (format "%.1f" (double n))))
+    (String/format java.util.Locale/ROOT "%.1f" (to-array [(double n)]))))
 
 (defn- site-count [killed survived uncovered]
   (+ (or killed 0) (or survived 0) (or uncovered 0)))

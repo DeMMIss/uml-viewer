@@ -109,9 +109,10 @@
         hide? drill?
         crap (rolled-crap classes id)
         mut (rolled-mutants classes id)]
-    (cond-> {:id id
+    (cond-> (merge (select-keys leaf [:lang :file :source-root :line :end-line])
+            {:id id
              :name (or (:name leaf) (node-label id))
-             :drill? drill?}
+             :drill? drill?})
       (:ns leaf) (assoc :ns (:ns leaf))
       (some? (:level leaf)) (assoc :level (:level leaf))
       (:stereotype leaf) (assoc :stereotype (:stereotype leaf))

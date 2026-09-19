@@ -80,10 +80,10 @@
 
 (defn format-crap [crap]
   (when (:mu crap)
-    (format "Crap μ %.1f   max %.1f   σ %.1f"
-            (double (:mu crap))
-            (double (or (:max crap) (:mu crap)))
-            (double (or (:sigma crap) 0)))))
+    (String/format java.util.Locale/ROOT "Crap μ %.1f   max %.1f   σ %.1f"
+                   (to-array [(double (:mu crap))
+                              (double (or (:max crap) (:mu crap)))
+                              (double (or (:sigma crap) 0))]))))
 
 (defn format-coverage [p]
   (when p

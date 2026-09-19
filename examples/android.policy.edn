@@ -1,0 +1,11 @@
+{:title "Android project"
+ :src "integration/fixtures/kotlin-project"
+ :prefix "com.acme"
+ :lang :kotlin
+ :modules [{:id :app :src "app/src/main/kotlin"}
+           {:id :domain :src "domain/src/main/kotlin"}
+           {:id :data :src "data/src/main/kotlin"}]
+ :out ".uml-viewer/android.edn"
+ :hierarchical true
+ :order [app data domain]
+ :levels [[domain] [data] [app]]}

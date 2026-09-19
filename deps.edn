@@ -23,6 +23,13 @@
                         speclj/speclj {:mvn/version "3.12.2"}
                         quil/quil {:mvn/version "4.3.1563"}}
            :main-opts ["-m" "clj-mutate.core"]}
+  :kotlin {:extra-deps {org.jetbrains.kotlin/kotlin-compiler-embeddable
+                        {:mvn/version "2.1.0"}}}
+  :check-kotlin {:extra-paths ["integration"]
+                 :main-opts ["-m" "uml-viewer.kotlin-language.check"]}
+  :check-viewer {:extra-paths ["integration"]
+                 :extra-deps {quil/quil {:mvn/version "4.3.1563"}}
+                 :main-opts ["-m" "uml-viewer.viewer-check"]}
   :ir {:main-opts ["-m" "uml-viewer.main.ir-generator"]}
   :run {:extra-deps {quil/quil {:mvn/version "4.3.1563"}}
         :main-opts ["-m" "uml-viewer.main.uml-viewer"]}
